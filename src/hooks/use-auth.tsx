@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   createContext,
@@ -9,17 +9,18 @@ import {
   useMemo,
   useRef,
   type ReactNode,
-} from "react";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
-import { DEFAULT_CURRENCY } from "@/lib/currency";
+} from 'react';
+import { createClient } from '@/lib/supabase/client';
+import type { User } from '@supabase/supabase-js';
+import { DEFAULT_CURRENCY } from '@/lib/currency';
+import { isActiveAccountSwitchEnabled } from '@/lib/auth/active-account';
 import {
   canEditSettings as canEditSettingsFor,
   canManageMembers as canManageMembersFor,
   canSendMessages as canSendMessagesFor,
   isAccountRole,
   type AccountRole,
-} from "@/lib/auth/roles";
+} from '@/lib/auth/roles';
 
 interface Profile {
   id: string;
@@ -43,6 +44,8 @@ interface AccountSummary {
   /** Default deal currency (ISO-4217). NOT NULL DEFAULT 'USD' in the
    *  DB (migration 021); narrowed to DEFAULT_CURRENCY when absent. */
   default_currency: string;
+  /** Role in this account when listing available accounts for switching. */
+  role?: AccountRole;
 }
 
 interface AuthContextValue {
@@ -102,6 +105,14 @@ interface AuthContextValue {
   canEditSettings: boolean;
   /** True if the caller can send messages and edit operational data (agent+). */
   canSendMessages: boolean;
+  /** Accounts available to the user in this session context. */
+  availableAccounts: AccountSummary[];
+  /** Switch active account for the current browser session. */
+  switchAccount: (
+    accountId: string
+  ) => Promise<{ ok: boolean; error?: string }>;
+  /** Clear session-level account override and return to legacy default account. */
+  clearActiveAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -112,9 +123,19 @@ const AuthContext = createContext<AuthContextValue | null>(null);
  * component, avoiding internal lock contention in the Supabase client.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const accountSwitchEnabled = isActiveAccountSwitchEnabled();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [account, setAccount] = useState<AccountSummary | null>(null);
+  const [activeAccount, setActiveAccount] = useState<AccountSummary | null>(
+    null
+  );
+  const [activeAccountId, setActiveAccountId] = useState<string | null>(null);
+  const [activeAccountRole, setActiveAccountRole] =
+    useState<AccountRole | null>(null);
+  const [availableAccounts, setAvailableAccounts] = useState<AccountSummary[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
   // Tracked separately from `loading`. The session settles fast (one
   // local cookie read); the profile fetch crosses the network and
@@ -127,103 +148,175 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // profileLoading back to true on window focus events/token refresh.
   const lastFetchedUserIdRef = useRef<string | null>(null);
 
-  // Shared across init, auth-state-change listener, and the exposed
-  // refreshProfile() callback. Reads the current session's user id and
-  // pulls the matching profile row along with its account summary.
-  const fetchProfile = useCallback(async (userId: string) => {
-    const supabase = createClient();
-    setProfileLoading(true);
-    lastFetchedUserIdRef.current = userId;
-    try {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select(
-          "id, full_name, email, avatar_url, role, beta_features, account_id, account_role",
-        )
-        .eq("user_id", userId)
-        .maybeSingle();
+  const fetchActiveAccount = useCallback(async () => {
+    if (!accountSwitchEnabled) {
+      setActiveAccount(null);
+      setActiveAccountId(null);
+      setActiveAccountRole(null);
+      setAvailableAccounts([]);
+      return;
+    }
 
-      if (error) {
-        console.error("[AuthProvider] fetchProfile error:", {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-        lastFetchedUserIdRef.current = null;
+    try {
+      const res = await fetch('/api/account/active', {
+        method: 'GET',
+        cache: 'no-store',
+      });
+      if (!res.ok) {
+        setActiveAccount(null);
+        setActiveAccountId(null);
+        setActiveAccountRole(null);
+        setAvailableAccounts([]);
         return;
       }
 
-      if (data) {
-        // Load the account with a plain lookup by id instead of an
-        // embedded FK join. The embed (`account:accounts!inner(...)`)
-        // forces PostgREST to resolve the profiles.account_id →
-        // accounts.id relationship from its schema cache; a stale cache
-        // (common right after a migration adds the FK) makes it fail
-        // hard with PGRST200 and blanks the whole profile — the user
-        // then loses account context everywhere (issue #294). A point
-        // lookup by id needs no relationship inference, so the profile
-        // (with account_id / account_role) still resolves even if the
-        // account name lookup itself can't.
-        let accountRow: AccountSummary | null = null;
-        if (data.account_id) {
-          const { data: account, error: accountErr } = await supabase
-            .from("accounts")
-            // default_currency added in migration 021; narrowed to the
-            // USD fallback below for older schemas where it reads null.
-            .select("id, name, default_currency")
-            .eq("id", data.account_id)
-            .maybeSingle();
-          if (accountErr) {
-            console.error("[AuthProvider] fetchAccount error:", {
-              message: accountErr.message,
-              details: accountErr.details,
-              hint: accountErr.hint,
-              code: accountErr.code,
-            });
-          } else if (account) {
-            accountRow = {
-              id: account.id,
-              name: account.name,
-              default_currency: account.default_currency ?? DEFAULT_CURRENCY,
-            };
+      const payload = (await res.json()) as {
+        account?: { id: string; name: string; default_currency?: string };
+        account_id?: string;
+        role?: string;
+        available_accounts?: Array<{
+          id: string;
+          name: string;
+          default_currency?: string;
+          role?: string;
+        }>;
+      };
+
+      const role = isAccountRole(payload.role) ? payload.role : null;
+      const accountRow = payload.account
+        ? {
+            id: payload.account.id,
+            name: payload.account.name,
+            default_currency:
+              payload.account.default_currency ?? DEFAULT_CURRENCY,
+            role: role ?? undefined,
           }
+        : null;
+
+      setActiveAccount(accountRow);
+      setActiveAccountId(payload.account_id ?? null);
+      setActiveAccountRole(role);
+
+      const accounts = (payload.available_accounts ?? [])
+        .filter((a) => !!a?.id && !!a?.name)
+        .map((a) => ({
+          id: a.id,
+          name: a.name,
+          default_currency: a.default_currency ?? DEFAULT_CURRENCY,
+          role: isAccountRole(a.role) ? a.role : undefined,
+        }));
+
+      setAvailableAccounts(accounts);
+    } catch (err) {
+      console.error('[AuthProvider] fetchActiveAccount threw:', err);
+      setActiveAccount(null);
+      setActiveAccountId(null);
+      setActiveAccountRole(null);
+      setAvailableAccounts([]);
+    }
+  }, [accountSwitchEnabled]);
+
+  // Shared across init, auth-state-change listener, and the exposed
+  // refreshProfile() callback. Reads the current session's user id and
+  // pulls the matching profile row along with its account summary.
+  const fetchProfile = useCallback(
+    async (userId: string) => {
+      const supabase = createClient();
+      setProfileLoading(true);
+      lastFetchedUserIdRef.current = userId;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select(
+            'id, full_name, email, avatar_url, role, beta_features, account_id, account_role'
+          )
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (error) {
+          console.error('[AuthProvider] fetchProfile error:', {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code,
+          });
+          lastFetchedUserIdRef.current = null;
+          return;
         }
 
-        // Narrow the DB enum into our AccountRole union. The DB
-        // constraint should make this unconditional, but a future
-        // migration that broadens the enum without updating TS would
-        // otherwise crash here — fall back to null and let UI gates
-        // treat the caller as least-privileged.
-        const accountRole = isAccountRole(data.account_role)
-          ? data.account_role
-          : null;
+        if (data) {
+          // Load the account with a plain lookup by id instead of an
+          // embedded FK join. The embed (`account:accounts!inner(...)`)
+          // forces PostgREST to resolve the profiles.account_id →
+          // accounts.id relationship from its schema cache; a stale cache
+          // (common right after a migration adds the FK) makes it fail
+          // hard with PGRST200 and blanks the whole profile — the user
+          // then loses account context everywhere (issue #294). A point
+          // lookup by id needs no relationship inference, so the profile
+          // (with account_id / account_role) still resolves even if the
+          // account name lookup itself can't.
+          let accountRow: AccountSummary | null = null;
+          if (data.account_id) {
+            const { data: account, error: accountErr } = await supabase
+              .from('accounts')
+              // default_currency added in migration 021; narrowed to the
+              // USD fallback below for older schemas where it reads null.
+              .select('id, name, default_currency')
+              .eq('id', data.account_id)
+              .maybeSingle();
+            if (accountErr) {
+              console.error('[AuthProvider] fetchAccount error:', {
+                message: accountErr.message,
+                details: accountErr.details,
+                hint: accountErr.hint,
+                code: accountErr.code,
+              });
+            } else if (account) {
+              accountRow = {
+                id: account.id,
+                name: account.name,
+                default_currency: account.default_currency ?? DEFAULT_CURRENCY,
+              };
+            }
+          }
 
-        setProfile({
-          id: data.id,
-          full_name: data.full_name,
-          email: data.email,
-          avatar_url: data.avatar_url,
-          role: data.role,
-          // `beta_features` is `NOT NULL DEFAULT ARRAY[]` in the DB, but
-          // narrow defensively in case the column hasn't been migrated yet
-          // (older deployments running 011 lazily) — `null` reads as no
-          // opt-ins, which is the safe default for any future beta gate.
-          beta_features: data.beta_features ?? [],
-          account_id: data.account_id ?? null,
-          account_role: accountRole,
-        });
-        setAccount(accountRow);
-      } else {
+          // Narrow the DB enum into our AccountRole union. The DB
+          // constraint should make this unconditional, but a future
+          // migration that broadens the enum without updating TS would
+          // otherwise crash here — fall back to null and let UI gates
+          // treat the caller as least-privileged.
+          const accountRole = isAccountRole(data.account_role)
+            ? data.account_role
+            : null;
+
+          setProfile({
+            id: data.id,
+            full_name: data.full_name,
+            email: data.email,
+            avatar_url: data.avatar_url,
+            role: data.role,
+            // `beta_features` is `NOT NULL DEFAULT ARRAY[]` in the DB, but
+            // narrow defensively in case the column hasn't been migrated yet
+            // (older deployments running 011 lazily) — `null` reads as no
+            // opt-ins, which is the safe default for any future beta gate.
+            beta_features: data.beta_features ?? [],
+            account_id: data.account_id ?? null,
+            account_role: accountRole,
+          });
+          setAccount(accountRow);
+          await fetchActiveAccount();
+        } else {
+          lastFetchedUserIdRef.current = null;
+        }
+      } catch (err) {
+        console.error('[AuthProvider] fetchProfile threw:', err);
         lastFetchedUserIdRef.current = null;
+      } finally {
+        setProfileLoading(false);
       }
-    } catch (err) {
-      console.error("[AuthProvider] fetchProfile threw:", err);
-      lastFetchedUserIdRef.current = null;
-    } finally {
-      setProfileLoading(false);
-    }
-  }, []);
+    },
+    [fetchActiveAccount]
+  );
 
   useEffect(() => {
     const supabase = createClient();
@@ -231,7 +324,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const safetyTimer = setTimeout(() => {
       if (mounted) {
-        console.warn("[AuthProvider] getSession() timed out after 3s");
+        console.warn('[AuthProvider] getSession() timed out after 3s');
         setLoading(false);
         setProfileLoading(false);
       }
@@ -244,7 +337,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           error,
         } = await supabase.auth.getSession();
 
-        if (error) console.error("[AuthProvider] getSession error:", error.message);
+        if (error)
+          console.error('[AuthProvider] getSession error:', error.message);
 
         if (!mounted) return;
         const currentUser = session?.user ?? null;
@@ -263,7 +357,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfileLoading(false);
         }
       } catch (err) {
-        console.error("[AuthProvider] init threw:", err);
+        console.error('[AuthProvider] init threw:', err);
       } finally {
         if (mounted) setLoading(false);
         clearTimeout(safetyTimer);
@@ -287,6 +381,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         lastFetchedUserIdRef.current = null;
         setProfile(null);
         setAccount(null);
+        setActiveAccount(null);
+        setActiveAccountId(null);
+        setActiveAccountRole(null);
+        setAvailableAccounts([]);
         setProfileLoading(false);
       }
 
@@ -306,7 +404,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setProfile(null);
     setAccount(null);
-    window.location.href = "/login";
+    setActiveAccount(null);
+    setActiveAccountId(null);
+    setActiveAccountRole(null);
+    setAvailableAccounts([]);
+    window.location.href = '/login';
   }, []);
 
   const refreshProfile = useCallback(async () => {
@@ -314,24 +416,73 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await fetchProfile(user.id);
   }, [user?.id, fetchProfile]);
 
+  const switchAccount = useCallback(
+    async (accountId: string): Promise<{ ok: boolean; error?: string }> => {
+      if (!accountSwitchEnabled) {
+        return { ok: false, error: 'Account switching is disabled' };
+      }
+      if (!user?.id) return { ok: false, error: 'Unauthorized' };
+
+      try {
+        const res = await fetch('/api/account/active', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ account_id: accountId }),
+        });
+        const payload = (await res.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        if (!res.ok) {
+          return {
+            ok: false,
+            error: payload?.error ?? 'Failed to switch account',
+          };
+        }
+
+        await fetchProfile(user.id);
+        return { ok: true };
+      } catch (err) {
+        console.error('[AuthProvider] switchAccount failed:', err);
+        return { ok: false, error: 'Failed to switch account' };
+      }
+    },
+    [accountSwitchEnabled, user?.id, fetchProfile]
+  );
+
+  const clearActiveAccount = useCallback(async () => {
+    if (!accountSwitchEnabled || !user?.id) return;
+    try {
+      await fetch('/api/account/active', { method: 'DELETE' });
+      await fetchProfile(user.id);
+    } catch (err) {
+      console.error('[AuthProvider] clearActiveAccount failed:', err);
+    }
+  }, [accountSwitchEnabled, user?.id, fetchProfile]);
+
   // Derive the role booleans once per profile change rather than on
   // every consumer render. Cheap regardless, but the memo also gives
   // each derived value a stable identity for React.memo / useEffect
   // dependencies downstream.
   const derived = useMemo(() => {
-    const role = profile?.account_role ?? null;
+    const role = activeAccountRole ?? profile?.account_role ?? null;
     return {
       accountRole: role,
-      accountId: profile?.account_id ?? null,
-      isOwner: role === "owner",
-      isAdmin: role === "admin",
-      isAgent: role === "agent",
-      isViewer: role === "viewer",
+      accountId: activeAccountId ?? profile?.account_id ?? null,
+      isOwner: role === 'owner',
+      isAdmin: role === 'admin',
+      isAgent: role === 'agent',
+      isViewer: role === 'viewer',
       canManageMembers: role ? canManageMembersFor(role) : false,
       canEditSettings: role ? canEditSettingsFor(role) : false,
       canSendMessages: role ? canSendMessagesFor(role) : false,
     };
-  }, [profile?.account_role, profile?.account_id]);
+  }, [
+    activeAccountRole,
+    activeAccountId,
+    profile?.account_role,
+    profile?.account_id,
+  ]);
 
   return (
     <AuthContext.Provider
@@ -342,8 +493,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profileLoading,
         signOut,
         refreshProfile,
-        account,
-        defaultCurrency: account?.default_currency ?? DEFAULT_CURRENCY,
+        switchAccount,
+        clearActiveAccount,
+        account: activeAccount ?? account,
+        availableAccounts,
+        defaultCurrency:
+          activeAccount?.default_currency ??
+          account?.default_currency ??
+          DEFAULT_CURRENCY,
         ...derived,
       }}
     >
@@ -369,10 +526,13 @@ export function useAuth(): AuthContextValue {
       loading: false,
       profileLoading: false,
       signOut: async () => {
-        window.location.href = "/login";
+        window.location.href = '/login';
       },
       refreshProfile: async () => {},
+      switchAccount: async () => ({ ok: false, error: 'Not available' }),
+      clearActiveAccount: async () => {},
       account: null,
+      availableAccounts: [],
       defaultCurrency: DEFAULT_CURRENCY,
       accountId: null,
       accountRole: null,

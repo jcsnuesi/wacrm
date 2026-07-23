@@ -185,7 +185,12 @@ export async function sendMessageToConversation(
     );
   }
 
-  validateSendMessageParams({ messageType, contentText, mediaUrl, templateName });
+  validateSendMessageParams({
+    messageType,
+    contentText,
+    mediaUrl,
+    templateName,
+  });
 
   const isMediaKind = (MEDIA_KINDS as readonly string[]).includes(messageType);
 
@@ -224,6 +229,7 @@ export async function sendMessageToConversation(
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', accountId)
+    .eq('is_active', true)
     .single();
 
   if (configError || !config) {

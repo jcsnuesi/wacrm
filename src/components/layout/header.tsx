@@ -1,40 +1,43 @@
-"use client";
+'use client';
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useAuth } from "@/hooks/use-auth";
-import { LogOut, Menu, Settings as SettingsIcon, User } from "lucide-react";
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useAuth } from '@/hooks/use-auth';
 import {
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
-} from "@/components/ui/avatar";
+  Check,
+  LogOut,
+  Menu,
+  Settings as SettingsIcon,
+  User,
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { ModeToggle } from "@/components/layout/mode-toggle";
+} from '@/components/ui/dropdown-menu';
+import { ModeToggle } from '@/components/layout/mode-toggle';
 
 const pageTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/inbox": "Inbox",
-  "/notifications": "Notifications",
-  "/contacts": "Contacts",
-  "/pipelines": "Pipelines",
-  "/broadcasts": "Broadcasts",
-  "/automations": "Automations",
-  "/settings": "Settings",
+  '/dashboard': 'Dashboard',
+  '/inbox': 'Inbox',
+  '/notifications': 'Notifications',
+  '/contacts': 'Contacts',
+  '/pipelines': 'Pipelines',
+  '/broadcasts': 'Broadcasts',
+  '/automations': 'Automations',
+  '/settings': 'Settings',
 };
 
 function getPageTitle(pathname: string): string {
   if (pageTitles[pathname]) return pageTitles[pathname];
   const match = Object.entries(pageTitles).find(([path]) =>
-    pathname.startsWith(path),
+    pathname.startsWith(path)
   );
-  return match ? match[1] : "Dashboard";
+  return match ? match[1] : 'Dashboard';
 }
 
 interface HeaderProps {
@@ -45,27 +48,40 @@ interface HeaderProps {
 
 export function Header({ onOpenSidebar }: HeaderProps) {
   const pathname = usePathname();
-  const { profile, signOut } = useAuth();
+  const { profile, signOut, accountId, availableAccounts, switchAccount } =
+    useAuth();
   const title = getPageTitle(pathname);
 
   const initial =
     profile?.full_name?.charAt(0)?.toUpperCase() ??
     profile?.email?.charAt(0)?.toUpperCase() ??
-    "U";
+    'U';
+
+  const canSwitchAccounts = availableAccounts.length > 1;
+
+  async function handleSwitchAccount(nextAccountId: string) {
+    if (!nextAccountId || nextAccountId === accountId) return;
+    const result = await switchAccount(nextAccountId);
+    if (!result.ok) {
+      toast.error(result.error || 'No se pudo cambiar de cuenta');
+      return;
+    }
+    toast.success('Cuenta activa actualizada');
+  }
 
   return (
-    <header className="flex h-14 shrink-0 items-center justify-between gap-3 border-b border-border bg-background px-4 lg:px-6">
+    <header className="border-border bg-background flex h-14 shrink-0 items-center justify-between gap-3 border-b px-4 lg:px-6">
       <div className="flex min-w-0 items-center gap-2">
         {/* Hamburger — mobile only. 44×44 hit target per Apple HIG. */}
         <button
           type="button"
           onClick={onOpenSidebar}
           aria-label="Open menu"
-          className="flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground lg:hidden"
+          className="text-muted-foreground hover:bg-muted hover:text-foreground flex h-10 w-10 items-center justify-center rounded-md transition-colors lg:hidden"
         >
           <Menu className="h-5 w-5" />
         </button>
-        <h1 className="truncate text-base font-semibold text-foreground sm:text-lg">
+        <h1 className="text-foreground truncate text-base font-semibold sm:text-lg">
           {title}
         </h1>
       </div>
@@ -74,70 +90,92 @@ export function Header({ onOpenSidebar }: HeaderProps) {
         <ModeToggle />
 
         <DropdownMenu>
-        <DropdownMenuTrigger
-          className="flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-muted/70 focus:bg-muted/70 focus:outline-none data-popup-open:bg-muted/70 sm:gap-3 sm:pl-1 sm:pr-3"
-          aria-label="Open account menu"
-        >
-          <Avatar className="size-8">
-            {profile?.avatar_url ? (
-              <AvatarImage
-                src={profile.avatar_url}
-                alt={profile.full_name ?? "Avatar"}
-              />
+          <DropdownMenuTrigger
+            className="hover:bg-muted/70 focus:bg-muted/70 data-popup-open:bg-muted/70 flex items-center gap-2 rounded-md px-1 py-1 transition-colors focus:outline-none sm:gap-3 sm:pr-3 sm:pl-1"
+            aria-label="Open account menu"
+          >
+            <Avatar className="size-8">
+              {profile?.avatar_url ? (
+                <AvatarImage
+                  src={profile.avatar_url}
+                  alt={profile.full_name ?? 'Avatar'}
+                />
+              ) : null}
+              <AvatarFallback className="bg-primary/10 text-primary text-sm font-medium">
+                {initial}
+              </AvatarFallback>
+            </Avatar>
+            <span className="text-foreground hidden text-sm font-medium sm:inline">
+              {profile?.full_name ?? 'User'}
+            </span>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="end"
+            sideOffset={6}
+            className="bg-popover text-popover-foreground ring-border min-w-56"
+          >
+            <div className="px-2 py-1.5">
+              <p className="text-foreground truncate text-sm font-medium">
+                {profile?.full_name ?? 'User'}
+              </p>
+              <p className="text-muted-foreground truncate text-xs">
+                {profile?.email ?? ''}
+              </p>
+            </div>
+            <DropdownMenuSeparator className="bg-border" />
+            <DropdownMenuItem
+              render={
+                <Link
+                  href="/settings?tab=profile"
+                  className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                />
+              }
+            >
+              <User className="size-4" />
+              Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              render={
+                <Link
+                  href="/settings?tab=whatsapp"
+                  className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                />
+              }
+            >
+              <SettingsIcon className="size-4" />
+              Settings
+            </DropdownMenuItem>
+            {canSwitchAccounts ? (
+              <>
+                <DropdownMenuSeparator className="bg-border" />
+                {availableAccounts.map((item) => {
+                  const selected = item.id === accountId;
+                  return (
+                    <DropdownMenuItem
+                      key={item.id}
+                      onClick={() => handleSwitchAccount(item.id)}
+                      className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+                    >
+                      <Check
+                        className={
+                          selected ? 'size-4 opacity-100' : 'size-4 opacity-0'
+                        }
+                      />
+                      <span className="truncate">{item.name}</span>
+                    </DropdownMenuItem>
+                  );
+                })}
+              </>
             ) : null}
-            <AvatarFallback className="bg-primary/10 text-sm font-medium text-primary">
-              {initial}
-            </AvatarFallback>
-          </Avatar>
-          <span className="hidden text-sm font-medium text-foreground sm:inline">
-            {profile?.full_name ?? "User"}
-          </span>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          sideOffset={6}
-          className="min-w-56 bg-popover text-popover-foreground ring-border"
-        >
-          <div className="px-2 py-1.5">
-            <p className="truncate text-sm font-medium text-foreground">
-              {profile?.full_name ?? "User"}
-            </p>
-            <p className="truncate text-xs text-muted-foreground">
-              {profile?.email ?? ""}
-            </p>
-          </div>
-          <DropdownMenuSeparator className="bg-border" />
-          <DropdownMenuItem
-            render={
-              <Link
-                href="/settings?tab=profile"
-                className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-              />
-            }
-          >
-            <User className="size-4" />
-            Profile
-          </DropdownMenuItem>
-          <DropdownMenuItem
-            render={
-              <Link
-                href="/settings?tab=whatsapp"
-                className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-              />
-            }
-          >
-            <SettingsIcon className="size-4" />
-            Settings
-          </DropdownMenuItem>
-          <DropdownMenuSeparator className="bg-border" />
-          <DropdownMenuItem
-            onClick={signOut}
-            className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
-          >
-            <LogOut className="size-4" />
-            Sign out
-          </DropdownMenuItem>
-        </DropdownMenuContent>
+            <DropdownMenuSeparator className="bg-border" />
+            <DropdownMenuItem
+              onClick={signOut}
+              className="text-popover-foreground focus:bg-accent focus:text-accent-foreground"
+            >
+              <LogOut className="size-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
         </DropdownMenu>
       </div>
     </header>
