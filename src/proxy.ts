@@ -1,7 +1,33 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+const PROTECTED_PAGE_PATHS = [
+  '/agents',
+  '/automations',
+  '/broadcasts',
+  '/contacts',
+  '/dashboard',
+  '/flows',
+  '/inbox',
+  '/notifications',
+  '/pipelines',
+  '/settings',
+]
+
+function isProtectedPagePath(pathname: string) {
+  return PROTECTED_PAGE_PATHS.some(
+    (path) => pathname === path || pathname.startsWith(`${path}/`)
+  )
+}
+
+function isPublicWhatsappWebhookPath(pathname: string) {
+  return (
+    pathname === '/api/whatsapp/webhook' ||
+    pathname.startsWith('/api/whatsapp/webhook/')
+  )
+}
+
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -13,7 +39,7 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)
@@ -70,16 +96,22 @@ export async function middleware(request: NextRequest) {
   }
 
   // Protected pages - redirect to login if not authenticated
-  const protectedPaths = ['/dashboard', '/inbox', '/contacts', '/pipelines', '/broadcasts', '/automations', '/settings']
-  if (!user && protectedPaths.some(path => request.nextUrl.pathname.startsWith(path))) {
+  if (
+    !user &&
+    isProtectedPagePath(request.nextUrl.pathname)
+  ) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
+    url.search = ''
     return withRefreshedCookies(NextResponse.redirect(url))
   }
 
   // API routes that need auth (not webhooks)
-  if (!user && request.nextUrl.pathname.startsWith('/api/whatsapp/') &&
-      !request.nextUrl.pathname.includes('/webhook')) {
+  if (
+    !user &&
+    request.nextUrl.pathname.startsWith('/api/whatsapp/') &&
+    !isPublicWhatsappWebhookPath(request.nextUrl.pathname)
+  ) {
     return withRefreshedCookies(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     )

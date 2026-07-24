@@ -49,6 +49,16 @@ interface WhatsAppConfigRow {
   is_active: boolean | null;
 }
 
+type ActiveWhatsAppConfigRow = Pick<
+  WhatsAppConfigRow,
+  'id' | 'phone_number_id' | 'access_token' | 'status' | 'is_active'
+>;
+
+type ExistingWhatsAppConfigRow = Pick<
+  WhatsAppConfigRow,
+  'id' | 'registered_at' | 'phone_number_id' | 'is_active'
+>;
+
 function isMissingIsActiveColumn(error: unknown): boolean {
   if (!error || typeof error !== 'object') return false;
   const code = (error as { code?: string }).code;
@@ -185,9 +195,10 @@ export async function GET() {
       )
       .eq('account_id', accountId);
 
-    const { data: config, error: configError } = supportsActiveColumn
+    const { data: rawConfig, error: configError } = supportsActiveColumn
       ? await activeQuery.eq('is_active', true).maybeSingle()
       : await activeQuery.maybeSingle();
+    const config = rawConfig as unknown as ActiveWhatsAppConfigRow | null;
 
     if (configError) {
       console.error('Error fetching whatsapp_config:', configError);
@@ -558,13 +569,14 @@ export async function POST(request: Request) {
       )
       .eq('account_id', accountId);
 
-    const { data: existing, error: existingError } = await (createMode
+    const { data: rawExisting, error: existingError } = await (createMode
       ? existingBaseQuery.eq('phone_number_id', phone_number_id).maybeSingle()
       : typeof config_id === 'string' && config_id && config_id !== 'new'
         ? existingBaseQuery.eq('id', config_id).maybeSingle()
         : supportsActiveColumn
           ? existingBaseQuery.eq('is_active', true).maybeSingle()
           : existingBaseQuery.maybeSingle());
+    const existing = rawExisting as unknown as ExistingWhatsAppConfigRow | null;
 
     if (existingError) {
       console.error('Error loading existing whatsapp_config:', existingError);

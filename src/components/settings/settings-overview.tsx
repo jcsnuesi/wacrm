@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type ReactNode } from 'react';
 import { ChevronRight, Loader2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/hooks/use-auth';
@@ -50,6 +51,9 @@ export function SettingsOverview({
     canManageMembers,
   } = useAuth();
   const { mode, theme } = useTheme();
+  const t = useTranslations('Settings.overview');
+  const tRoles = useTranslations('Settings.roles');
+  const tSections = useTranslations('Settings.sections');
 
   const [counts, setCounts] = useState<OverviewCounts | null>(null);
   const [countsLoading, setCountsLoading] = useState(true);
@@ -167,7 +171,7 @@ export function SettingsOverview({
     };
   }, [user?.id, accountId, canManageMembers]);
 
-  const displayName = profile?.full_name || profile?.email || 'Your account';
+  const displayName = profile?.full_name || profile?.email || t('yourAccount');
   const initial = (profile?.full_name || profile?.email || 'U')
     .charAt(0)
     .toUpperCase();
@@ -191,14 +195,14 @@ export function SettingsOverview({
       section: 'whatsapp',
       loading: whatsappLoading,
       subtitle: !whatsapp?.configured ? (
-        'Not set up yet'
+        t('notSetup')
       ) : whatsapp.connected ? (
         <>
-          <StatusDot tone="ok" /> Connected
+          <StatusDot tone="ok" /> {t('connected')}
         </>
       ) : (
         <>
-          <StatusDot tone="muted" /> Needs reconnecting
+          <StatusDot tone="muted" /> {t('needsReconnecting')}
         </>
       ),
     },
@@ -207,12 +211,10 @@ export function SettingsOverview({
       loading: countsLoading,
       subtitle:
         counts?.members == null
-          ? 'View team members'
-          : `${counts.members} member${counts.members === 1 ? '' : 's'}${
+          ? t('viewTeamMembers')
+          : `${t('membersCount', { count: counts.members })}${
               counts.pendingInvites
-                ? ` · ${counts.pendingInvites} pending invite${
-                    counts.pendingInvites === 1 ? '' : 's'
-                  }`
+                ? ` · ${t('pendingInvites', { count: counts.pendingInvites })}`
                 : ''
             }`,
     },
@@ -221,10 +223,10 @@ export function SettingsOverview({
       loading: countsLoading,
       subtitle:
         counts?.templates == null
-          ? 'Manage message templates'
-          : `${counts.templates} template${counts.templates === 1 ? '' : 's'}${
+          ? t('manageTemplates')
+          : `${t('templatesCount', { count: counts.templates })}${
               counts.templatesPending
-                ? ` · ${counts.templatesPending} pending review`
+                ? ` · ${t('pendingReview', { count: counts.templatesPending })}`
                 : ''
             }`,
     },
@@ -238,15 +240,18 @@ export function SettingsOverview({
       loading: countsLoading,
       subtitle:
         counts?.tags == null && counts?.customFields == null
-          ? 'Tags and custom fields'
-          : `${counts?.tags ?? 0} tag${counts?.tags === 1 ? '' : 's'} · ${
-              counts?.customFields ?? 0
-            } custom field${counts?.customFields === 1 ? '' : 's'}`,
+          ? t('tagsAndFields')
+          : `${t('tagsCount', { count: counts?.tags ?? 0 })} · ${t(
+              'fieldsCount',
+              {
+                count: counts?.customFields ?? 0,
+              }
+            )}`,
     },
     {
       section: 'appearance',
       loading: false,
-      subtitle: `${cap(mode)} mode · ${themeName} accent`,
+      subtitle: t('appearance', { mode: cap(mode), theme: themeName }),
     },
   ];
 
@@ -275,7 +280,7 @@ export function SettingsOverview({
         {roleMeta && RoleIcon ? (
           <SettingsChip variant={roleMeta.variant}>
             <RoleIcon />
-            {roleMeta.label}
+            {tRoles(accountRole!)}
           </SettingsChip>
         ) : null}
       </Card>
@@ -300,12 +305,12 @@ export function SettingsOverview({
               </span>
               <span className="min-w-0 flex-1">
                 <span className="text-foreground block text-sm font-semibold">
-                  {meta.label}
+                  {tSections(section)}
                 </span>
                 <span className="text-muted-foreground mt-0.5 flex items-center gap-1.5 text-xs">
                   {loading ? (
                     <>
-                      <Loader2 className="size-3 animate-spin" /> Loading…
+                      <Loader2 className="size-3 animate-spin" /> {t('loading')}
                     </>
                   ) : (
                     subtitle

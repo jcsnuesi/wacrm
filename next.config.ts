@@ -1,4 +1,7 @@
 import type { NextConfig } from 'next';
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
 
 /**
  * Baseline security headers applied to every response.
@@ -60,8 +63,39 @@ const SECURITY_HEADERS = [
   },
 ] as const;
 
+const PRIVATE_PAGE_PATTERN =
+  'agents(?:/|$)|automations(?:/|$)|broadcasts(?:/|$)|contacts(?:/|$)|dashboard(?:/|$)|flows(?:/|$)|inbox(?:/|$)|notifications(?:/|$)|pipelines(?:/|$)|settings(?:/|$)';
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+
+  /**
+   * Cross-origin dev access (Next.js 16).
+   *
+   * Next 16 blocks requests to dev-only resources (`/_next/*` internals,
+   * the HMR websocket, the dev overlay) unless the browser's Origin is
+   * the host the dev server booted on — `localhost` by default. Tunnels
+   * like ngrok serve the app from a public HTTPS host, so without
+   * allow-listing that host those dev requests come back 403: HMR stops
+   * working and the dev session degrades over the tunnel (issue #365).
+   *
+   * Wildcards match subdomains only (Next's CSRF matcher), so the
+   * randomised tunnel subdomain is covered. Add any other host via
+   * `ALLOWED_DEV_ORIGINS` (comma-separated). This key is dev-only and
+   * has no effect on a production build.
+   */
+  allowedDevOrigins: [
+    '*.ngrok-free.app',
+    '*.ngrok.app',
+    '*.ngrok.io',
+    '*.trycloudflare.com',
+    '*.loca.lt',
+    ...(process.env.ALLOWED_DEV_ORIGINS
+      ? process.env.ALLOWED_DEV_ORIGINS.split(',')
+          .map((origin) => origin.trim())
+          .filter(Boolean)
+      : []),
+  ],
 
   /**
    * Cache-Control policy.
@@ -81,21 +115,16 @@ const nextConfig: NextConfig = {
    *     the correct production headers for hashed assets.
    *   - /api/*          — no-store. API responses are per-user and
    *     must never be shared across requests at the edge.
-   *   - Everything else — public, brief s-maxage + generous
+    *   - Authenticated app pages — private, no-store. These must never
+    *     be shared by a CDN, even if a host tries to cache HTML.
+    *   - Everything public — brief s-maxage + generous
    *     stale-while-revalidate. The edge serves instantly from cache
    *     for the first 5 min, then returns cached content while
    *     refreshing in the background for up to 24 h. A deploy's
    *     chunk-hash drift self-heals within ~5 min with no user-
    *     visible latency.
    *
-   *   Note: dynamic dashboard routes (/inbox, /contacts, /pipelines,
-   *   /broadcasts, etc.) are server-rendered per request — Next.js
-   *   and Supabase auth already prevent them from being served
-   *   from a shared cache. The s-maxage here is a ceiling; Next.js
-   *   and auth middleware still set `private` / `no-store` for
-   *   per-user responses.
-   *
-   * Security headers are appended via a separate catch-all rule
+    * Security headers are appended via a separate catch-all rule
    * below — Next.js merges headers from every matching rule, so
    * they apply to every response regardless of which cache rule
    * matched.
@@ -107,7 +136,16 @@ const nextConfig: NextConfig = {
         headers: [{ key: 'Cache-Control', value: 'no-store' }],
       },
       {
-        source: '/:path((?!_next/static|_next/image|api).*)',
+        source: `/:path(${PRIVATE_PAGE_PATTERN}.*)`,
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'private, no-store',
+          },
+        ],
+      },
+      {
+        source: `/:path((?!_next/static|_next/image|api|${PRIVATE_PAGE_PATTERN}).*)`,
         headers: [
           {
             key: 'Cache-Control',
@@ -127,4 +165,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);
