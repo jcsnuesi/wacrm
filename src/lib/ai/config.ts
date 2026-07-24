@@ -85,7 +85,7 @@ export async function loadAiConfig(
   if (error) throw error
   if (!data) return null
 
-  const row = data as AiConfigRow
+  const row = data as unknown as AiConfigRow
   // The Playground passes requireActive:false so an admin can test the
   // agent before flipping the master switch on.
   if (requireActive && !row.is_active) return null

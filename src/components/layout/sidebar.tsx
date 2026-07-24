@@ -10,6 +10,7 @@ import { useUnreadNotifications } from '@/hooks/use-unread-notifications';
 import {
   Bell,
   Bot,
+  Check,
   Crown,
   GitBranch,
   LayoutDashboard,
@@ -188,7 +189,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     }
   }
 
-  async function handleSwitchWhatsappLine(nextConfigId: string) {
+  async function handleSwitchWhatsappLine(nextConfigId: string | null) {
     if (!nextConfigId || nextConfigId === activeWhatsappConfigId) return;
 
     const target = whatsappConfigs.find((item) => item.id === nextConfigId);
