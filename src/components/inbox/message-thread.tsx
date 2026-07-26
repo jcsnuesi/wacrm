@@ -47,11 +47,9 @@ import {
   type SendMediaPayload,
 } from './message-composer';
 import { deleteAccountMedia } from '@/lib/storage/upload-media';
-import {
-  TemplatePicker,
-  type TemplateSendValues,
-} from './template-picker';
+import { TemplatePicker, type TemplateSendValues } from './template-picker';
 import { AiThreadBanner } from './ai-thread-banner';
+import { AiPipelineRoutingBanner } from './ai-pipeline-routing-banner';
 import { buildReplyPreview } from './reply-quote';
 import { toast } from 'sonner';
 
@@ -661,10 +659,7 @@ export function MessageThread({
   }, []);
 
   const handleSendTemplate = useCallback(
-    async (
-      template: MessageTemplate,
-      values: TemplateSendValues
-    ) => {
+    async (template: MessageTemplate, values: TemplateSendValues) => {
       if (!conversation) return;
 
       const renderedBody = renderTemplateBody(template.body_text, values.body);
@@ -1175,6 +1170,11 @@ export function MessageThread({
           </div>
         )}
       </div>
+
+      <AiPipelineRoutingBanner
+        conversationId={conversation.id}
+        resyncToken={resyncToken}
+      />
 
       {/* AI auto-reply banner — take over an active bot, or resume it
           after a handoff. Renders nothing unless the account has

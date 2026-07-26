@@ -8,6 +8,7 @@ import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { dispatchInboundToFlows } from '@/lib/flows/engine';
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
+import { dispatchInboundToAiPipeline } from '@/lib/ai/pipeline-routing';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import {
   handleTemplateWebhookChange,
@@ -713,7 +714,7 @@ async function processMessage(
     .eq('sender_type', 'customer');
   const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) === 0;
 
-  const { error: msgError } = await supabaseAdmin()
+  const { data: insertedMessage, error: msgError } = await supabaseAdmin()
     .from('messages')
     .insert({
       conversation_id: conversation.id,
@@ -729,9 +730,11 @@ async function processMessage(
       // the column; null for every other content_type so existing inserts
       // behave identically.
       interactive_reply_id: interactiveReplyId,
-    });
+    })
+    .select('id')
+    .single();
 
-  if (msgError) {
+  if (msgError || !insertedMessage) {
     console.error('Error inserting message:', msgError);
     return;
   }
@@ -846,19 +849,31 @@ async function processMessage(
     }).catch((err) => console.error('[automations] dispatch failed:', err));
   }
 
-  // AI auto-reply. Runs only for plain-text inbound the deterministic
-  // flow runner did NOT consume (flows win over the LLM), and only when
-  // the account has enabled it. Awaited inside `after()` (same reason as
-  // the webhook dispatch below); `dispatchInboundToAiReply` owns its
-  // eligibility gates + try/catch and never throws.
-  if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
-    await dispatchInboundToAiReply({
+  // AI pipeline routing is deliberately independent from auto-reply:
+  // every persisted inbound is classified even when a Flow consumed it,
+  // an automation is active, or a human owns the conversation. Auto-reply
+  // keeps its existing eligibility gates. Run both concurrently inside
+  // `after()` so classification adds no latency to the customer reply.
+  const aiTasks: Promise<void>[] = [];
+  aiTasks.push(
+    dispatchInboundToAiPipeline({
       accountId,
       conversationId: conversation.id,
       contactId: contactRecord.id,
-      configOwnerUserId,
-    });
+      sourceMessageId: insertedMessage.id,
+    })
+  );
+  if (!flowConsumed && !interactiveReplyId && inboundText.trim()) {
+    aiTasks.push(
+      dispatchInboundToAiReply({
+        accountId,
+        conversationId: conversation.id,
+        contactId: contactRecord.id,
+        configOwnerUserId,
+      })
+    );
   }
+  await Promise.all(aiTasks);
 
   // message.received webhook (public API). Awaited — not fire-and-forget
   // — because we're inside the route's `after()` block, which only keeps
