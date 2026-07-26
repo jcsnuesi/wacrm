@@ -528,7 +528,9 @@ export function MessageThread({
           ? payload.caption || payload.filename || 'Document'
           : payload.caption;
 
-      const tempId = `temp-${Date.now()}`;
+      // A photo batch invokes this callback several times in the same tick.
+      // UUIDs prevent optimistic bubbles from overwriting each other.
+      const tempId = `temp-${crypto.randomUUID()}`;
       const optimisticMsg: Message = {
         id: tempId,
         conversation_id: conversation.id,

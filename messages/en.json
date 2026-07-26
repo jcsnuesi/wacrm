@@ -196,6 +196,10 @@
       "draftWithAI": "Draft a reply with AI",
       "addCaption": "Add a caption…",
       "removeAttachment": "Remove attachment",
+      "photosSelected": "{count, plural, one {# photo selected} other {# photos selected}}",
+      "sendPhotos": "{count, plural, one {Send photo} other {Send # photos}}",
+      "photoLimit": "You can send up to {max} photos at once.",
+      "photosUploadFailed": "{count, plural, one {# photo could not be uploaded.} other {# photos could not be uploaded.}}",
       "moreActions": "More",
       "interactiveMessage": "Interactive message",
       "quickReplies": "Quick replies",
@@ -218,7 +222,11 @@
       "interactiveReply": "[Interactive reply]",
       "unsupported": "[Unsupported message type]",
       "aiBadge": "AI",
-      "aiBadgeTitle": "Sent automatically by the AI assistant"
+      "aiBadgeTitle": "Sent automatically by the AI assistant",
+      "openImage": "Open image preview",
+      "imagePreview": "Image preview",
+      "downloadImage": "Download",
+      "downloadFailed": "The image could not be downloaded."
     },
     "actions": {
       "reply": "Reply",
