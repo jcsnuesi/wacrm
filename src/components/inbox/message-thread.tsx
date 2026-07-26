@@ -674,6 +674,7 @@ export function MessageThread({
         sender_type: 'agent',
         content_type: 'template',
         content_text: renderedBody,
+        media_url: values.headerMediaUrl,
         template_name: template.name,
         status: 'sending',
         created_at: new Date().toISOString(),

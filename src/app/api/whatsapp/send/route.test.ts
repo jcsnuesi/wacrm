@@ -163,11 +163,14 @@ vi.mock('@/lib/whatsapp/encryption', () => ({
   isLegacyFormat: vi.fn(() => false),
 }));
 
-const { sendTemplateMessage } = vi.hoisted(() => ({
+const { sendTemplateMessage, uploadTemplateHeaderMedia } = vi.hoisted(() => ({
   sendTemplateMessage: vi.fn(async () => ({ messageId: 'wamid-1' })),
+  uploadTemplateHeaderMedia: vi.fn(async () => 'meta-media-1'),
 }));
 vi.mock('@/lib/whatsapp/meta-api', () => ({
   sendTemplateMessage,
+  isWacrmChatMediaUrl: vi.fn(() => true),
+  uploadTemplateHeaderMedia,
   sendTextMessage: vi.fn(),
   sendMediaMessage: vi.fn(),
 }));
@@ -212,6 +215,7 @@ describe('POST /api/whatsapp/send — contact_id template path', () => {
     providerKind = 'meta';
     supabaseMock = makeSupabaseMock();
     sendTemplateMessage.mockClear();
+    uploadTemplateHeaderMedia.mockClear();
   });
 
   afterEach(() => {
@@ -279,13 +283,23 @@ describe('POST /api/whatsapp/send — contact_id template path', () => {
     });
 
     expect(res.status).toBe(200);
+    expect(uploadTemplateHeaderMedia).toHaveBeenCalledWith({
+      phoneNumberId: 'PNID-1',
+      accessToken: 'plaintext-token',
+      mediaUrl: 'https://cdn.example.com/header.jpg',
+    });
     const args = (sendTemplateMessage.mock.calls[0] as unknown[])[0] as Record<
       string,
       unknown
     >;
     expect(args.messageParams).toEqual({
       body: ['Acme', '#1234'],
-      headerMediaUrl: 'https://cdn.example.com/header.jpg',
+      headerMediaUrl: undefined,
+      headerMediaId: 'meta-media-1',
+    });
+    expect(messageInserts[0]).toMatchObject({
+      content_type: 'template',
+      media_url: 'https://cdn.example.com/header.jpg',
     });
   });
 

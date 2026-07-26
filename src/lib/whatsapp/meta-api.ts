@@ -362,6 +362,77 @@ export interface SendTemplateMessageArgs {
   contextMessageId?: string
 }
 
+export interface UploadTemplateHeaderMediaArgs {
+  phoneNumberId: string
+  accessToken: string
+  mediaUrl: string
+}
+
+export function isWacrmChatMediaUrl(mediaUrl: string): boolean {
+  try {
+    const storageBase = process.env.NEXT_PUBLIC_SUPABASE_URL
+    if (!storageBase) return false
+    const sourceUrl = new URL(mediaUrl)
+    return (
+      sourceUrl.origin === new URL(storageBase).origin &&
+      sourceUrl.pathname.startsWith('/storage/v1/object/public/chat-media/')
+    )
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Upload a template header staged in our public Supabase chat-media bucket
+ * to Meta and return its media id. Using an id is more reliable than asking
+ * Meta to fetch a third-party link while processing the message send.
+ *
+ * The strict origin + path check prevents this authenticated endpoint from
+ * becoming an SSRF proxy for arbitrary URLs supplied by a client.
+ */
+export async function uploadTemplateHeaderMedia(
+  args: UploadTemplateHeaderMediaArgs
+): Promise<string> {
+  const { phoneNumberId, accessToken, mediaUrl } = args
+  const sourceUrl = new URL(mediaUrl)
+  if (!isWacrmChatMediaUrl(mediaUrl)) {
+    throw new Error(
+      'Template header media must be uploaded through the WACRM chat-media bucket.'
+    )
+  }
+
+  const sourceResponse = await fetch(sourceUrl, {
+    signal: AbortSignal.timeout(15_000),
+  })
+  if (!sourceResponse.ok) {
+    throw new Error(`Header media download failed: ${sourceResponse.status}`)
+  }
+
+  const contentType = sourceResponse.headers.get('content-type')
+  if (!contentType) throw new Error('Header media has no content type')
+  const blob = await sourceResponse.blob()
+  const filename =
+    decodeURIComponent(sourceUrl.pathname.split('/').pop() || '') ||
+    'template-header'
+
+  const form = new FormData()
+  form.append('messaging_product', 'whatsapp')
+  form.append('file', blob, filename)
+
+  const response = await fetch(`${META_API_BASE}/${phoneNumberId}/media`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: form,
+    signal: AbortSignal.timeout(20_000),
+  })
+  if (!response.ok) {
+    await throwMetaError(response, `Meta media upload failed: ${response.status}`)
+  }
+  const data = (await response.json()) as { id?: string }
+  if (!data.id) throw new Error('Meta media upload returned no media id')
+  return data.id
+}
+
 /**
  * Send a pre-approved WhatsApp message template. Required outside
  * the 24-hour window and for any first-touch messaging.
@@ -435,6 +506,7 @@ export async function sendTemplateMessage(
       Authorization: `Bearer ${accessToken}`,
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(20_000),
   })
   if (!response.ok) {
     await throwMetaError(response, `Meta API error: ${response.status}`)

@@ -153,7 +153,15 @@ export function TemplatePicker({
         console.error("Failed to fetch templates:", error);
         setTemplates([]);
       } else {
-        setTemplates((data as MessageTemplate[]) ?? []);
+        // Meta syncs its built-in hello_world demo into production WABAs,
+        // but Graph rejects it with #131058 unless the sender is one of
+        // Meta's Public Test Numbers. Hiding it prevents a guaranteed
+        // failure on real CRM conversations; it remains visible in Settings.
+        setTemplates(
+          ((data as MessageTemplate[]) ?? []).filter(
+            (template) => template.name !== "hello_world",
+          ),
+        );
       }
       setLoading(false);
     })();

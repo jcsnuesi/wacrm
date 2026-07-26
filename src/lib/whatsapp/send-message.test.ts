@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   sendMessageToConversation,
   SendMessageError,
+  isPublicTestTemplateError,
   isTwilioSessionOpen,
   type SendMessageParams,
 } from './send-message';
@@ -156,6 +157,17 @@ describe('SendMessageError', () => {
     expect(e.code).toBe('meta_error');
     expect(e.status).toBe(502);
     expect(e).toBeInstanceOf(Error);
+  });
+});
+
+describe('Meta public test template errors', () => {
+  it('recognizes error 131058 and its provider message', () => {
+    expect(
+      isPublicTestTemplateError(
+        '(#131058) Hello World templates can only be sent from the Public Test Numbers'
+      )
+    ).toBe(true);
+    expect(isPublicTestTemplateError('unrelated Meta error')).toBe(false);
   });
 });
 

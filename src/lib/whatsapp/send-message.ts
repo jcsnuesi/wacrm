@@ -27,6 +27,8 @@ import {
   sendMediaMessage,
   sendInteractiveButtons,
   sendInteractiveList,
+  isWacrmChatMediaUrl,
+  uploadTemplateHeaderMedia,
   type MediaKind,
 } from '@/lib/whatsapp/meta-api';
 import {
@@ -44,7 +46,10 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
-import { TemplateSendValidationError } from '@/lib/whatsapp/template-send-builder';
+import {
+  TemplateSendValidationError,
+  type SendTimeParams,
+} from '@/lib/whatsapp/template-send-builder';
 import {
   sendTwilioMessage,
   TwilioProviderError,
@@ -74,6 +79,13 @@ export class SendMessageError extends Error {
   }
 }
 
+/** Meta's built-in hello_world sample is restricted to public test lines. */
+export function isPublicTestTemplateError(message: string): boolean {
+  return /131058|Hello World templates can only be sent from the Public Test Numbers/i.test(
+    message
+  );
+}
+
 export interface SendMessageParams {
   conversationId: string;
   messageType: string;
@@ -85,7 +97,7 @@ export interface SendMessageParams {
   /** Legacy positional body params (only used if messageParams.body unset). */
   templateParams?: string[];
   /** Structured template params (header/body/buttons). */
-  templateMessageParams?: unknown;
+  templateMessageParams?: SendTimeParams;
   /** Structured payload for `messageType === 'interactive'`. */
   interactivePayload?: InteractiveMessagePayload | null;
   replyToMessageId?: string | null;
@@ -420,6 +432,14 @@ export async function sendMessageToConversation(
     templateRow = data ?? null;
   }
 
+  const templateHeaderMediaUrl =
+    messageType === 'template'
+      ? templateMessageParams?.headerMediaUrl ||
+        templateRow?.header_media_url ||
+        null
+      : null;
+  let templateHeaderMediaId = templateMessageParams?.headerMediaId;
+
   const attempt = async (phone: string): Promise<string> => {
     if (provider === 'twilio') {
       if (!config.sender_phone) {
@@ -447,6 +467,17 @@ export async function sendMessageToConversation(
       throw new Error('Meta access token is missing');
     }
     if (messageType === 'template') {
+      if (
+        templateHeaderMediaUrl &&
+        !templateHeaderMediaId &&
+        isWacrmChatMediaUrl(templateHeaderMediaUrl)
+      ) {
+        templateHeaderMediaId = await uploadTemplateHeaderMedia({
+          phoneNumberId: config.phone_number_id,
+          accessToken,
+          mediaUrl: templateHeaderMediaUrl,
+        });
+      }
       const result = await sendTemplateMessage({
         phoneNumberId: config.phone_number_id,
         accessToken,
@@ -454,7 +485,13 @@ export async function sendMessageToConversation(
         templateName: templateName!,
         language: templateLanguage || 'en_US',
         template: templateRow ?? undefined,
-        messageParams: templateMessageParams ?? undefined,
+        messageParams: {
+          ...templateMessageParams,
+          headerMediaUrl: templateHeaderMediaId
+            ? undefined
+            : templateHeaderMediaUrl || undefined,
+          headerMediaId: templateHeaderMediaId,
+        },
         params: templateParams || [],
         contextMessageId,
       });
@@ -547,6 +584,13 @@ export async function sendMessageToConversation(
     if (err instanceof TemplateSendValidationError) {
       throw new SendMessageError('bad_request', message, 400);
     }
+    if (isPublicTestTemplateError(message)) {
+      throw new SendMessageError(
+        'meta_test_template_only',
+        'The Meta hello_world sample can only be sent from a Public Test Number. Select an approved template created for this production WhatsApp number.',
+        400
+      );
+    }
     if (provider === 'twilio') {
       console.error('[send-message] Twilio send failed:', message);
       throw new SendMessageError(
@@ -584,7 +628,7 @@ export async function sendMessageToConversation(
       sender_type: senderType,
       content_type: messageType,
       content_text: interactiveBody ?? contentText ?? null,
-      media_url: mediaUrl || null,
+      media_url: templateHeaderMediaUrl || mediaUrl || null,
       template_name: templateName || null,
       interactive_payload:
         messageType === 'interactive' ? interactivePayload : null,
