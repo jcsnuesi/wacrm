@@ -6,7 +6,7 @@
 // Given a conversation and message params, this:
 //   1. validates the params for the message type,
 //   2. loads the conversation + contact + WhatsApp config,
-//   3. sends to Meta (with phone-variant retry + contact auto-fix),
+//   3. dispatches through the conversation's pinned provider,
 //   4. persists the message + updates the conversation,
 //   5. pauses any active Flow run for the contact (agent stepped in).
 //
@@ -88,6 +88,8 @@ export interface SendMessageParams {
   /** Structured payload for `messageType === 'interactive'`. */
   interactivePayload?: InteractiveMessagePayload | null;
   replyToMessageId?: string | null;
+  /** Internal callers use `bot`; dashboard/public API sends default to agent. */
+  senderType?: 'agent' | 'bot';
 }
 
 export interface SendMessageResult {
@@ -95,6 +97,20 @@ export interface SendMessageResult {
   messageId: string;
   /** Provider id: Meta `wamid` or Twilio `SM...`. */
   whatsappMessageId: string;
+  provider: 'meta' | 'twilio';
+}
+
+export function isTwilioSessionOpen(
+  lastInboundAt: string | null | undefined,
+  now = Date.now()
+): boolean {
+  if (!lastInboundAt) return false;
+  const openedAt = new Date(lastInboundAt).getTime();
+  return (
+    Number.isFinite(openedAt) &&
+    now >= openedAt &&
+    now - openedAt < 24 * 60 * 60 * 1000
+  );
 }
 
 /**
@@ -206,6 +222,7 @@ export async function sendMessageToConversation(
     templateMessageParams,
     interactivePayload,
     replyToMessageId,
+    senderType = 'agent',
   } = params;
 
   if (!conversationId) {
@@ -287,6 +304,32 @@ export async function sendMessageToConversation(
       'Approved Twilio templates are not enabled for this line.',
       400
     );
+  }
+  if (provider === 'twilio') {
+    const { data: latestInbound, error: inboundError } = await db
+      .from('messages')
+      .select('created_at')
+      .eq('conversation_id', conversationId)
+      .eq('sender_type', 'customer')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (inboundError) {
+      throw new SendMessageError(
+        'db_error',
+        `Could not verify the Twilio customer-service window: ${inboundError.message}`,
+        500
+      );
+    }
+
+    if (!isTwilioSessionOpen(latestInbound?.created_at)) {
+      throw new SendMessageError(
+        'twilio_session_expired',
+        'The 24-hour Twilio customer-service window is closed. Approved Twilio templates are not enabled for this line.',
+        400
+      );
+    }
   }
   if (
     provider === 'twilio' &&
@@ -534,7 +577,7 @@ export async function sendMessageToConversation(
     .from('messages')
     .insert({
       conversation_id: conversationId,
-      sender_type: 'agent',
+      sender_type: senderType,
       content_type: messageType,
       content_text: interactiveBody ?? contentText ?? null,
       media_url: mediaUrl || null,
@@ -552,7 +595,7 @@ export async function sendMessageToConversation(
     console.error('[send-message] error inserting sent message:', msgError);
     throw new SendMessageError(
       'db_error',
-      `Message sent to Meta but failed to save to DB: ${msgError.message}`,
+      `Message sent through ${provider} but failed to save to DB: ${msgError.message}`,
       500
     );
   }
@@ -571,28 +614,34 @@ export async function sendMessageToConversation(
     })
     .eq('id', conversationId);
 
-  // Pause any active Flow run for this contact — the agent stepping in
-  // is the strongest "yield, human is here" signal. Best-effort.
-  try {
-    const { error: pauseErr } = await supabaseAdmin()
-      .from('flow_runs')
-      .update({
-        status: 'paused_by_agent',
-        ended_at: new Date().toISOString(),
-        end_reason: 'agent_replied',
-      })
-      .eq('account_id', accountId)
-      .eq('contact_id', contact.id)
-      .eq('status', 'active');
-    if (pauseErr) {
-      console.error('[flows] pause-on-agent-send failed:', pauseErr.message);
+  if (senderType === 'agent') {
+    // A human response pauses active Flows. Automation sends must not pause
+    // the workflow that owns them or an unrelated deterministic automation.
+    try {
+      const { error: pauseErr } = await supabaseAdmin()
+        .from('flow_runs')
+        .update({
+          status: 'paused_by_agent',
+          ended_at: new Date().toISOString(),
+          end_reason: 'agent_replied',
+        })
+        .eq('account_id', accountId)
+        .eq('contact_id', contact.id)
+        .eq('status', 'active');
+      if (pauseErr) {
+        console.error('[flows] pause-on-agent-send failed:', pauseErr.message);
+      }
+    } catch (err) {
+      console.error(
+        '[flows] pause-on-agent-send threw:',
+        err instanceof Error ? err.message : err
+      );
     }
-  } catch (err) {
-    console.error(
-      '[flows] pause-on-agent-send threw:',
-      err instanceof Error ? err.message : err
-    );
   }
 
-  return { messageId: messageRecord.id, whatsappMessageId: waMessageId };
+  return {
+    messageId: messageRecord.id,
+    whatsappMessageId: waMessageId,
+    provider,
+  };
 }

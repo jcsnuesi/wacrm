@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import {
   sendMessageToConversation,
   SendMessageError,
+  isTwilioSessionOpen,
   type SendMessageParams,
 } from './send-message';
 
@@ -155,5 +156,20 @@ describe('SendMessageError', () => {
     expect(e.code).toBe('meta_error');
     expect(e.status).toBe(502);
     expect(e).toBeInstanceOf(Error);
+  });
+});
+
+describe('Twilio customer-service window', () => {
+  const now = new Date('2026-07-25T20:00:00.000Z').getTime();
+
+  it('accepts the latest inbound message for less than 24 hours', () => {
+    expect(isTwilioSessionOpen('2026-07-24T20:00:00.001Z', now)).toBe(true);
+  });
+
+  it('rejects missing, future, invalid, and expired timestamps', () => {
+    expect(isTwilioSessionOpen(null, now)).toBe(false);
+    expect(isTwilioSessionOpen('invalid', now)).toBe(false);
+    expect(isTwilioSessionOpen('2026-07-25T20:00:00.001Z', now)).toBe(false);
+    expect(isTwilioSessionOpen('2026-07-24T20:00:00.000Z', now)).toBe(false);
   });
 });

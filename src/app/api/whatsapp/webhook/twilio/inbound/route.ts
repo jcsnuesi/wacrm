@@ -1,5 +1,6 @@
 import { after } from 'next/server';
 
+import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
@@ -125,6 +126,16 @@ async function processInbound(params: Record<string, string>): Promise<void> {
     ? `/api/whatsapp/twilio/media/${encodeURIComponent(messageSid)}`
     : null;
 
+  // Match Meta's first-message semantics before inserting this row. The
+  // conversation is line-specific, so a contact can start independently on
+  // a Meta and a Twilio sender without one suppressing the other's trigger.
+  const { count: priorCustomerMsgCount } = await db
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conversationResult.id)
+    .eq('sender_type', 'customer');
+  const isFirstInboundMessage = (priorCustomerMsgCount ?? 0) === 0;
+
   const { data: inserted, error: insertError } = await db
     .from('messages')
     .insert({
@@ -169,6 +180,38 @@ async function processInbound(params: Record<string, string>): Promise<void> {
     text: contentText,
     contact_created: contactCreated,
   });
+
+  const automationTriggers: Array<
+    | 'new_contact_created'
+    | 'first_inbound_message'
+    | 'new_message_received'
+    | 'keyword_match'
+    | 'interactive_reply'
+  > = ['new_message_received', 'keyword_match'];
+  if (interactiveReplyId) automationTriggers.push('interactive_reply');
+  if (contactCreated) automationTriggers.unshift('new_contact_created');
+  if (isFirstInboundMessage) {
+    automationTriggers.unshift('first_inbound_message');
+  }
+
+  // This route already runs inside Next.js `after`, so await each dispatcher
+  // to keep self-hosted/Docker runtimes alive until automation logs and sends
+  // have been scheduled. Deterministic automations are enabled; Flows and AI
+  // remain deliberately absent from the Twilio path.
+  await Promise.all(
+    automationTriggers.map((triggerType) =>
+      runAutomationsForTrigger({
+        accountId: config.account_id,
+        triggerType,
+        contactId: contact.id,
+        context: {
+          message_text: contentText || '',
+          conversation_id: conversationResult.id,
+          interactive_reply_id: interactiveReplyId || undefined,
+        },
+      })
+    )
+  );
 }
 
 function mediaContentType(

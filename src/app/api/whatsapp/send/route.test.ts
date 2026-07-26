@@ -61,6 +61,11 @@ function makeSupabaseMock() {
           };
         case 'message_templates':
           return { data: null, error: null };
+        case 'messages':
+          return {
+            data: { created_at: new Date().toISOString() },
+            error: null,
+          };
         default:
           return { data: null, error: null };
       }

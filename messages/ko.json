@@ -887,6 +887,20 @@
       "saveDraft": "초안 저장",
       "untitled": "제목 없는 자동화",
       "backToAutomations": "자동화로 돌아가기",
+      "canvas": {
+        "focusSelected": "선택한 단계 가운데로 이동",
+        "closeInspector": "단계 편집기 닫기"
+      },
+      "inspector": {
+        "action": "작업",
+        "condition": "조건",
+        "moveUp": "단계 위로 이동",
+        "moveDown": "단계 아래로 이동"
+      },
+      "tree": {
+        "nodeNotFound": "이 단계가 더 이상 존재하지 않습니다. 자동화를 다시 불러오세요.",
+        "branchNotFound": "이 분기가 더 이상 존재하지 않습니다. 자동화를 다시 불러오세요."
+      },
       "toasts": {
         "saved": "자동화가 저장되었습니다",
         "created": "자동화가 생성되었습니다",

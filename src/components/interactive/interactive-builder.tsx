@@ -1,21 +1,21 @@
-"use client";
+"use client"
 
-import { useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { useState } from "react"
+import { Plus, Trash2 } from "lucide-react"
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
-import { slugify } from "@/components/flows/shared";
-import { INTERACTIVE_LIMITS } from "@/lib/whatsapp/meta-api";
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { cn } from "@/lib/utils"
+import { slugify } from "@/components/flows/shared"
+import { INTERACTIVE_LIMITS } from "@/lib/whatsapp/meta-api"
 import {
   validateInteractivePayload,
   type InteractiveButtonsPayload,
   type InteractiveListPayload,
   type InteractiveMessagePayload,
-} from "@/lib/whatsapp/interactive";
-import { InteractivePreview } from "./interactive-preview";
+} from "@/lib/whatsapp/interactive"
+import { InteractivePreview } from "./interactive-preview"
 
 // ------------------------------------------------------------
 // Blank payload factories — used to seed a fresh builder and to
@@ -29,10 +29,10 @@ import { InteractivePreview } from "./interactive-preview";
  * silently blocks sending. Increment past any taken id instead.
  */
 function nextId(existing: string[], prefix: string): string {
-  const taken = new Set(existing);
-  let n = existing.length + 1;
-  while (taken.has(`${prefix}${n}`)) n++;
-  return `${prefix}${n}`;
+  const taken = new Set(existing)
+  let n = existing.length + 1
+  while (taken.has(`${prefix}${n}`)) n++
+  return `${prefix}${n}`
 }
 
 export function blankButtonsPayload(): InteractiveButtonsPayload {
@@ -40,7 +40,7 @@ export function blankButtonsPayload(): InteractiveButtonsPayload {
     kind: "buttons",
     body: "",
     buttons: [{ id: "btn_1", title: "" }],
-  };
+  }
 }
 
 export function blankListPayload(): InteractiveListPayload {
@@ -49,14 +49,16 @@ export function blankListPayload(): InteractiveListPayload {
     body: "",
     button_label: "Menu",
     sections: [{ title: "", rows: [{ id: "row_1", title: "" }] }],
-  };
+  }
 }
 
 interface InteractiveBuilderProps {
-  value: InteractiveMessagePayload;
-  onChange: (payload: InteractiveMessagePayload) => void;
+  value: InteractiveMessagePayload
+  onChange: (payload: InteractiveMessagePayload) => void
   /** Show the live WhatsApp-style preview beside the form. Default true. */
-  showPreview?: boolean;
+  showPreview?: boolean
+  /** Keep form and preview stacked inside narrow inspectors. */
+  layout?: "responsive" | "stacked"
 }
 
 /**
@@ -70,25 +72,35 @@ export function InteractiveBuilder({
   value,
   onChange,
   showPreview = true,
+  layout = "responsive",
 }: InteractiveBuilderProps) {
-  const [advanced, setAdvanced] = useState(false);
-  const validation = validateInteractivePayload(value);
+  const [advanced, setAdvanced] = useState(false)
+  const validation = validateInteractivePayload(value)
 
   const setField = (patch: Partial<InteractiveMessagePayload>) =>
-    onChange({ ...value, ...patch } as InteractiveMessagePayload);
+    onChange({ ...value, ...patch } as InteractiveMessagePayload)
 
   const switchKind = (kind: "buttons" | "list") => {
-    if (kind === value.kind) return;
-    const shared = { body: value.body, header: value.header, footer: value.footer };
+    if (kind === value.kind) return
+    const shared = {
+      body: value.body,
+      header: value.header,
+      footer: value.footer,
+    }
     onChange(
       kind === "buttons"
         ? { ...blankButtonsPayload(), ...shared }
-        : { ...blankListPayload(), ...shared },
-    );
-  };
+        : { ...blankListPayload(), ...shared }
+    )
+  }
 
   return (
-    <div className="flex flex-col gap-4 md:flex-row">
+    <div
+      className={cn(
+        "flex flex-col gap-4",
+        layout === "responsive" && "md:flex-row"
+      )}
+    >
       <div className="flex min-w-0 flex-1 flex-col gap-3">
         {/* Kind toggle */}
         <div className="flex gap-2">
@@ -104,17 +116,20 @@ export function InteractiveBuilder({
           />
         </div>
 
-        <Field label="Body" counter={`${value.body.length}/${INTERACTIVE_LIMITS.bodyMaxLength}`}>
+        <Field
+          label="Body"
+          counter={`${value.body.length}/${INTERACTIVE_LIMITS.bodyMaxLength}`}
+        >
           <Textarea
             value={value.body}
             maxLength={INTERACTIVE_LIMITS.bodyMaxLength}
             onChange={(e) => setField({ body: e.target.value })}
             placeholder="What the customer reads above the options"
-            className="min-h-20 bg-muted text-foreground"
+            className="bg-muted text-foreground min-h-20"
           />
         </Field>
 
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Field
             label="Header (optional)"
             counter={`${(value.header ?? "").length}/${INTERACTIVE_LIMITS.headerTextMaxLength}`}
@@ -140,17 +155,21 @@ export function InteractiveBuilder({
         </div>
 
         {value.kind === "buttons" ? (
-          <ButtonsEditor value={value} onChange={onChange} advanced={advanced} />
+          <ButtonsEditor
+            value={value}
+            onChange={onChange}
+            advanced={advanced}
+          />
         ) : (
           <ListEditor value={value} onChange={onChange} advanced={advanced} />
         )}
 
-        <label className="flex items-center gap-2 text-xs text-muted-foreground">
+        <label className="text-muted-foreground flex items-center gap-2 text-xs">
           <input
             type="checkbox"
             checked={advanced}
             onChange={(e) => setAdvanced(e.target.checked)}
-            className="h-3.5 w-3.5 accent-primary"
+            className="accent-primary h-3.5 w-3.5"
           />
           Show reply IDs (advanced)
         </label>
@@ -161,17 +180,22 @@ export function InteractiveBuilder({
       </div>
 
       {showPreview && (
-        <div className="flex shrink-0 flex-col gap-1.5 md:w-[280px]">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+        <div
+          className={cn(
+            "flex shrink-0 flex-col gap-1.5",
+            layout === "responsive" && "md:w-[280px]"
+          )}
+        >
+          <span className="text-muted-foreground text-[11px] font-medium tracking-wide uppercase">
             Preview
           </span>
-          <div className="rounded-lg bg-muted/40 p-3">
+          <div className="bg-muted/40 rounded-lg p-3">
             <InteractivePreview payload={value} />
           </div>
         </div>
       )}
     </div>
-  );
+  )
 }
 
 // ------------------------------------------------------------
@@ -183,44 +207,55 @@ function ButtonsEditor({
   onChange,
   advanced,
 }: {
-  value: InteractiveButtonsPayload;
-  onChange: (p: InteractiveMessagePayload) => void;
-  advanced: boolean;
+  value: InteractiveButtonsPayload
+  onChange: (p: InteractiveMessagePayload) => void
+  advanced: boolean
 }) {
-  const buttons = value.buttons;
-  const update = (idx: number, patch: Partial<InteractiveButtonsPayload["buttons"][number]>) =>
+  const buttons = value.buttons
+  const update = (
+    idx: number,
+    patch: Partial<InteractiveButtonsPayload["buttons"][number]>
+  ) =>
     onChange({
       ...value,
       buttons: buttons.map((b, i) => (i === idx ? { ...b, ...patch } : b)),
-    });
+    })
   const add = () =>
     onChange({
       ...value,
       buttons: [
         ...buttons,
-        { id: nextId(buttons.map((b) => b.id), "btn_"), title: "" },
+        {
+          id: nextId(
+            buttons.map((b) => b.id),
+            "btn_"
+          ),
+          title: "",
+        },
       ],
-    });
+    })
   const remove = (idx: number) =>
-    onChange({ ...value, buttons: buttons.filter((_, i) => i !== idx) });
+    onChange({ ...value, buttons: buttons.filter((_, i) => i !== idx) })
 
   return (
     <div>
-      <label className="mb-2 block text-xs text-muted-foreground">
+      <label className="text-muted-foreground mb-2 block text-xs">
         Buttons ({buttons.length}/{INTERACTIVE_LIMITS.maxButtons})
       </label>
       <div className="flex flex-col gap-2">
         {buttons.map((b, i) => (
           <div
             key={i}
-            className="flex items-center gap-2 rounded-md border border-border bg-muted/40 p-2"
+            className="border-border bg-muted/40 flex items-center gap-2 rounded-md border p-2"
           >
             {advanced && (
               <Input
                 value={b.id}
-                onChange={(e) => update(i, { id: slugify(e.target.value, `btn_${i + 1}`) })}
+                onChange={(e) =>
+                  update(i, { id: slugify(e.target.value, `btn_${i + 1}`) })
+                }
                 placeholder="id"
-                className="w-28 bg-muted font-mono text-xs"
+                className="bg-muted w-28 font-mono text-xs"
               />
             )}
             <Input
@@ -228,9 +263,9 @@ function ButtonsEditor({
               maxLength={INTERACTIVE_LIMITS.buttonTitleMaxLength}
               onChange={(e) => update(i, { title: e.target.value })}
               placeholder="Button label"
-              className="flex-1 bg-muted"
+              className="bg-muted flex-1"
             />
-            <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">
+            <span className="text-muted-foreground w-10 shrink-0 text-right text-[10px]">
               {b.title.length}/{INTERACTIVE_LIMITS.buttonTitleMaxLength}
             </span>
             {buttons.length > 1 && (
@@ -253,7 +288,7 @@ function ButtonsEditor({
         </Button>
       )}
     </div>
-  );
+  )
 }
 
 // ------------------------------------------------------------
@@ -265,48 +300,57 @@ function ListEditor({
   onChange,
   advanced,
 }: {
-  value: InteractiveListPayload;
-  onChange: (p: InteractiveMessagePayload) => void;
-  advanced: boolean;
+  value: InteractiveListPayload
+  onChange: (p: InteractiveMessagePayload) => void
+  advanced: boolean
 }) {
-  const sections = value.sections;
-  const totalRows = sections.reduce((n, s) => n + s.rows.length, 0);
-  const allRowIds = () => sections.flatMap((s) => s.rows.map((r) => r.id));
+  const sections = value.sections
+  const totalRows = sections.reduce((n, s) => n + s.rows.length, 0)
+  const allRowIds = () => sections.flatMap((s) => s.rows.map((r) => r.id))
 
-  const updateSection = (sIdx: number, patch: Partial<InteractiveListPayload["sections"][number]>) =>
+  const updateSection = (
+    sIdx: number,
+    patch: Partial<InteractiveListPayload["sections"][number]>
+  ) =>
     onChange({
       ...value,
       sections: sections.map((s, i) => (i === sIdx ? { ...s, ...patch } : s)),
-    });
+    })
   const updateRow = (
     sIdx: number,
     rIdx: number,
-    patch: Partial<InteractiveListPayload["sections"][number]["rows"][number]>,
+    patch: Partial<InteractiveListPayload["sections"][number]["rows"][number]>
   ) =>
     onChange({
       ...value,
       sections: sections.map((s, i) =>
         i === sIdx
-          ? { ...s, rows: s.rows.map((r, j) => (j === rIdx ? { ...r, ...patch } : r)) }
-          : s,
+          ? {
+              ...s,
+              rows: s.rows.map((r, j) => (j === rIdx ? { ...r, ...patch } : r)),
+            }
+          : s
       ),
-    });
+    })
   const addRow = (sIdx: number) =>
     onChange({
       ...value,
       sections: sections.map((s, i) =>
         i === sIdx
-          ? { ...s, rows: [...s.rows, { id: nextId(allRowIds(), "row_"), title: "" }] }
-          : s,
+          ? {
+              ...s,
+              rows: [...s.rows, { id: nextId(allRowIds(), "row_"), title: "" }],
+            }
+          : s
       ),
-    });
+    })
   const removeRow = (sIdx: number, rIdx: number) =>
     onChange({
       ...value,
       sections: sections.map((s, i) =>
-        i === sIdx ? { ...s, rows: s.rows.filter((_, j) => j !== rIdx) } : s,
+        i === sIdx ? { ...s, rows: s.rows.filter((_, j) => j !== rIdx) } : s
       ),
-    });
+    })
   const addSection = () =>
     onChange({
       ...value,
@@ -314,13 +358,16 @@ function ListEditor({
         ...sections,
         { title: "", rows: [{ id: nextId(allRowIds(), "row_"), title: "" }] },
       ],
-    });
+    })
   const removeSection = (sIdx: number) =>
-    onChange({ ...value, sections: sections.filter((_, i) => i !== sIdx) });
+    onChange({ ...value, sections: sections.filter((_, i) => i !== sIdx) })
 
   return (
     <div className="flex flex-col gap-3">
-      <Field label="List button label" counter={`${value.button_label.length}/${INTERACTIVE_LIMITS.buttonTitleMaxLength}`}>
+      <Field
+        label="List button label"
+        counter={`${value.button_label.length}/${INTERACTIVE_LIMITS.buttonTitleMaxLength}`}
+      >
         <Input
           value={value.button_label}
           maxLength={INTERACTIVE_LIMITS.buttonTitleMaxLength}
@@ -329,18 +376,21 @@ function ListEditor({
         />
       </Field>
 
-      <label className="block text-xs text-muted-foreground">
+      <label className="text-muted-foreground block text-xs">
         Rows ({totalRows}/{INTERACTIVE_LIMITS.maxListRowsTotal})
       </label>
 
       {sections.map((section, sIdx) => (
-        <div key={sIdx} className="rounded-md border border-border bg-muted/40 p-2">
+        <div
+          key={sIdx}
+          className="border-border bg-muted/40 rounded-md border p-2"
+        >
           <div className="mb-2 flex items-center gap-2">
             <Input
               value={section.title ?? ""}
               onChange={(e) => updateSection(sIdx, { title: e.target.value })}
               placeholder="Section title (optional)"
-              className="flex-1 bg-muted text-xs"
+              className="bg-muted flex-1 text-xs"
             />
             {sections.length > 1 && (
               <Button
@@ -355,27 +405,35 @@ function ListEditor({
           </div>
           <div className="flex flex-col gap-2">
             {section.rows.map((row, rIdx) => (
-              <div key={rIdx} className="rounded border border-border bg-card p-2">
+              <div
+                key={rIdx}
+                className="border-border bg-card rounded border p-2"
+              >
                 <div className="flex items-center gap-2">
                   {advanced && (
                     <Input
                       value={row.id}
                       onChange={(e) =>
-                        updateRow(sIdx, rIdx, { id: slugify(e.target.value, `row_${rIdx + 1}`) })
+                        updateRow(sIdx, rIdx, {
+                          id: slugify(e.target.value, `row_${rIdx + 1}`),
+                        })
                       }
                       placeholder="id"
-                      className="w-24 bg-muted font-mono text-xs"
+                      className="bg-muted w-24 font-mono text-xs"
                     />
                   )}
                   <Input
                     value={row.title}
                     maxLength={INTERACTIVE_LIMITS.listRowTitleMaxLength}
-                    onChange={(e) => updateRow(sIdx, rIdx, { title: e.target.value })}
+                    onChange={(e) =>
+                      updateRow(sIdx, rIdx, { title: e.target.value })
+                    }
                     placeholder="Row title"
-                    className="flex-1 bg-muted"
+                    className="bg-muted flex-1"
                   />
-                  <span className="w-10 shrink-0 text-right text-[10px] text-muted-foreground">
-                    {row.title.length}/{INTERACTIVE_LIMITS.listRowTitleMaxLength}
+                  <span className="text-muted-foreground w-10 shrink-0 text-right text-[10px]">
+                    {row.title.length}/
+                    {INTERACTIVE_LIMITS.listRowTitleMaxLength}
                   </span>
                   {totalRows > 1 && (
                     <Button
@@ -391,15 +449,22 @@ function ListEditor({
                 <Input
                   value={row.description ?? ""}
                   maxLength={INTERACTIVE_LIMITS.listRowDescriptionMaxLength}
-                  onChange={(e) => updateRow(sIdx, rIdx, { description: e.target.value })}
+                  onChange={(e) =>
+                    updateRow(sIdx, rIdx, { description: e.target.value })
+                  }
                   placeholder="Description (optional)"
-                  className="mt-2 bg-muted text-xs"
+                  className="bg-muted mt-2 text-xs"
                 />
               </div>
             ))}
           </div>
           {totalRows < INTERACTIVE_LIMITS.maxListRowsTotal && (
-            <Button variant="ghost" size="sm" onClick={() => addRow(sIdx)} className="mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => addRow(sIdx)}
+              className="mt-2"
+            >
               <Plus className="h-3.5 w-3.5" />
               Add row
             </Button>
@@ -415,7 +480,7 @@ function ListEditor({
           </Button>
         )}
     </div>
-  );
+  )
 }
 
 // ------------------------------------------------------------
@@ -427,9 +492,9 @@ function KindButton({
   label,
   onClick,
 }: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
+  active: boolean
+  label: string
+  onClick: () => void
 }) {
   return (
     <button
@@ -439,12 +504,12 @@ function KindButton({
         "flex-1 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors",
         active
           ? "border-primary bg-primary/10 text-primary"
-          : "border-border bg-muted text-muted-foreground hover:text-foreground",
+          : "border-border bg-muted text-muted-foreground hover:text-foreground"
       )}
     >
       {label}
     </button>
-  );
+  )
 }
 
 function Field({
@@ -452,17 +517,19 @@ function Field({
   counter,
   children,
 }: {
-  label: string;
-  counter?: string;
-  children: React.ReactNode;
+  label: string
+  counter?: string
+  children: React.ReactNode
 }) {
   return (
     <div>
       <div className="mb-1 flex items-center justify-between">
-        <label className="text-xs text-muted-foreground">{label}</label>
-        {counter && <span className="text-[10px] text-muted-foreground">{counter}</span>}
+        <label className="text-muted-foreground text-xs">{label}</label>
+        {counter && (
+          <span className="text-muted-foreground text-[10px]">{counter}</span>
+        )}
       </div>
       {children}
     </div>
-  );
+  )
 }

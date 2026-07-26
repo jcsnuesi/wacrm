@@ -888,6 +888,20 @@
       "saveDraft": "Save Draft",
       "untitled": "Untitled automation",
       "backToAutomations": "Back to automations",
+      "canvas": {
+        "focusSelected": "Center selected step",
+        "closeInspector": "Close step editor"
+      },
+      "inspector": {
+        "action": "Action",
+        "condition": "Condition",
+        "moveUp": "Move step up",
+        "moveDown": "Move step down"
+      },
+      "tree": {
+        "nodeNotFound": "This step no longer exists. Reload the automation.",
+        "branchNotFound": "This branch no longer exists. Reload the automation."
+      },
       "toasts": {
         "saved": "Automation saved",
         "created": "Automation created",

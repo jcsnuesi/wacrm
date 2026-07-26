@@ -109,8 +109,11 @@ inválida.
 - In-session quick-reply buttons and list pickers through Twilio Content API.
 - Incoming button/list selections, quoted-message context, and delivery/read
   status updates.
-- Approved Twilio templates, broadcasts, Flows, automations, reactions, and AI
-  auto-replies are intentionally not enabled for Twilio lines in this phase.
+- Deterministic inbox automations can send text, quick-reply buttons, and list
+  pickers through the line attached to the conversation, within the 24-hour
+  customer-service window.
+- Approved Twilio templates, broadcasts, Flows, reactions, and AI auto-replies
+  are intentionally not enabled for Twilio lines in this phase.
 
 Video and document captions are hidden for Twilio because WhatsApp discards a
 body sent with those media types. Send the explanatory text as a separate
