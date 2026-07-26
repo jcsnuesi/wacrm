@@ -7,8 +7,8 @@ const toErrorResponse = vi.fn((err: unknown) => {
 });
 
 vi.mock('@/lib/auth/account', () => ({
-  getCurrentAccount: (...args: unknown[]) => getCurrentAccount(...args),
-  toErrorResponse: (...args: unknown[]) => toErrorResponse(...args),
+  getCurrentAccount,
+  toErrorResponse,
 }));
 
 afterEach(() => {

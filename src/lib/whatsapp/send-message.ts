@@ -44,6 +44,10 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import {
+  sendTwilioMessage,
+  TwilioProviderError,
+} from '@/lib/whatsapp/twilio-api';
 
 export const MEDIA_KINDS = ['image', 'video', 'document', 'audio'] as const;
 export const VALID_MESSAGE_TYPES = [
@@ -89,7 +93,7 @@ export interface SendMessageParams {
 export interface SendMessageResult {
   /** Our `messages.id` (the persisted row). */
   messageId: string;
-  /** Meta's `wamid` for the delivered message. */
+  /** Provider id: Meta `wamid` or Twilio `SM...`. */
   whatsappMessageId: string;
 }
 
@@ -225,7 +229,7 @@ export async function sendMessageToConversation(
   // Conversation + contact, account-scoped.
   const { data: conversation, error: convError } = await db
     .from('conversations')
-    .select('*, contact:contacts(*)')
+    .select('*, contact:contacts(*), whatsapp_config:whatsapp_config(*)')
     .eq('id', conversationId)
     .eq('account_id', accountId)
     .single();
@@ -252,13 +256,21 @@ export async function sendMessageToConversation(
     );
   }
 
-  // WhatsApp config, account-scoped.
-  const { data: config, error: configError } = await db
-    .from('whatsapp_config')
-    .select('*')
-    .eq('account_id', accountId)
-    .eq('is_active', true)
-    .single();
+  // A conversation is pinned to the line that created it. Legacy rows that
+  // predate migration 037 fall back to the active line once, preserving the
+  // old behaviour until the migration backfill attaches them permanently.
+  let config = conversation.whatsapp_config;
+  let configError: unknown = null;
+  if (!config) {
+    const fallback = await db
+      .from('whatsapp_config')
+      .select('*')
+      .eq('account_id', accountId)
+      .eq('is_active', true)
+      .maybeSingle();
+    config = fallback.data;
+    configError = fallback.error;
+  }
 
   if (configError || !config) {
     throw new SendMessageError(
@@ -268,10 +280,39 @@ export async function sendMessageToConversation(
     );
   }
 
-  const accessToken = decrypt(config.access_token);
+  const provider = config.provider === 'twilio' ? 'twilio' : 'meta';
+  if (provider === 'twilio' && messageType === 'template') {
+    throw new SendMessageError(
+      'twilio_templates_unsupported',
+      'Approved Twilio templates are not enabled for this line.',
+      400
+    );
+  }
+  if (
+    provider === 'twilio' &&
+    isMediaKind &&
+    (messageType === 'video' || messageType === 'document') &&
+    contentText
+  ) {
+    throw new SendMessageError(
+      'twilio_caption_unsupported',
+      `Twilio WhatsApp does not deliver captions with ${messageType} messages. Send the text separately.`,
+      400
+    );
+  }
+
+  const accessToken =
+    provider === 'meta' && config.access_token
+      ? decrypt(config.access_token)
+      : null;
 
   // Self-heal legacy CBC ciphertexts. Fire-and-forget; idempotent.
-  if (isLegacyFormat(config.access_token)) {
+  if (
+    provider === 'meta' &&
+    config.access_token &&
+    accessToken &&
+    isLegacyFormat(config.access_token)
+  ) {
     void db
       .from('whatsapp_config')
       .update({ access_token: encrypt(accessToken) })
@@ -317,7 +358,7 @@ export async function sendMessageToConversation(
   // Template row (for header + button components). isMessageTemplate
   // guards against a malformed local row crashing the send-builder.
   let templateRow: MessageTemplate | null = null;
-  if (messageType === 'template' && templateName) {
+  if (provider === 'meta' && messageType === 'template' && templateName) {
     const { data } = await db
       .from('message_templates')
       .select('*')
@@ -336,6 +377,31 @@ export async function sendMessageToConversation(
   }
 
   const attempt = async (phone: string): Promise<string> => {
+    if (provider === 'twilio') {
+      if (!config.sender_phone) {
+        throw new TwilioProviderError(
+          'The Twilio line has no sender phone configured.'
+        );
+      }
+      const result = await sendTwilioMessage({
+        db,
+        accountId,
+        from: config.sender_phone,
+        to: phone,
+        body:
+          messageType === 'interactive'
+            ? interactivePayload!.body
+            : contentText || undefined,
+        mediaUrl: isMediaKind ? mediaUrl! : undefined,
+        interactivePayload:
+          messageType === 'interactive' ? interactivePayload! : undefined,
+      });
+      return result.messageId;
+    }
+
+    if (!accessToken) {
+      throw new Error('Meta access token is missing');
+    }
     if (messageType === 'template') {
       const result = await sendTemplateMessage({
         phoneNumberId: config.phone_number_id,
@@ -401,13 +467,15 @@ export async function sendMessageToConversation(
     return result.messageId;
   };
 
-  // Send via Meta — retry across phone-number variants if Meta rejects
+  // Meta retries phone-number variants. Twilio receives exactly one strict
+  // E.164 target and is never allowed to fall through to Graph API.
   // with "recipient not in allowed list"; persist a working variant
   // back to the contact so the next send goes straight through.
   let waMessageId = '';
   let workingPhone = sanitizedPhone;
   try {
-    const variants = phoneVariants(sanitizedPhone);
+    const variants =
+      provider === 'meta' ? phoneVariants(sanitizedPhone) : [sanitizedPhone];
     let lastError: unknown = null;
 
     for (const variant of variants) {
@@ -418,7 +486,7 @@ export async function sendMessageToConversation(
         break;
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        if (!isRecipientNotAllowedError(message)) {
+        if (provider !== 'meta' || !isRecipientNotAllowedError(message)) {
           throw err;
         }
         lastError = err;
@@ -431,7 +499,15 @@ export async function sendMessageToConversation(
     if (lastError) throw lastError;
   } catch (err) {
     const message =
-      err instanceof Error ? err.message : 'Unknown Meta API error';
+      err instanceof Error ? err.message : `Unknown ${provider} API error`;
+    if (provider === 'twilio') {
+      console.error('[send-message] Twilio send failed:', message);
+      throw new SendMessageError(
+        'twilio_error',
+        `Twilio API error: ${message}`,
+        502
+      );
+    }
     console.error('[send-message] Meta send failed for all variants:', message);
     throw new SendMessageError('meta_error', `Meta API error: ${message}`, 502);
   }

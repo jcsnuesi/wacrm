@@ -86,6 +86,7 @@ export async function engineSendText(
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', args.accountId)
+    .eq('provider', 'meta')
     .eq('is_active', true)
     .single();
   if (configErr || !config) {
@@ -200,6 +201,7 @@ export async function engineSendMedia(
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', args.accountId)
+    .eq('provider', 'meta')
     .eq('is_active', true)
     .single();
   if (configErr || !config) {
@@ -356,6 +358,7 @@ async function sendInteractiveViaMeta(
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', input.accountId)
+    .eq('provider', 'meta')
     .eq('is_active', true)
     .single();
   if (configErr || !config) {

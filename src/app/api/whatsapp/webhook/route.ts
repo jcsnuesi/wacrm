@@ -319,6 +319,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           // inserts that need it for NOT NULL FK compliance. Always
           // the admin who saved the WhatsApp config.
           config.user_id,
+          config.id,
           decryptedAccessToken
         );
       }
@@ -588,6 +589,7 @@ async function processMessage(
   // (contacts, conversations). Always the admin who saved the
   // WhatsApp config; the choice is arbitrary post-017 but stable.
   configOwnerUserId: string,
+  whatsappConfigId: string,
   accessToken: string
 ) {
   const senderPhone = normalizePhone(message.from);
@@ -607,7 +609,8 @@ async function processMessage(
   const convResult = await findOrCreateConversation(
     accountId,
     configOwnerUserId,
-    contactRecord.id
+    contactRecord.id,
+    whatsappConfigId
   );
   if (!convResult) return;
   const conversation = convResult.conversation;
@@ -1084,7 +1087,8 @@ async function findOrCreateContact(
 async function findOrCreateConversation(
   accountId: string,
   configOwnerUserId: string,
-  contactId: string
+  contactId: string,
+  whatsappConfigId: string
 ) {
   // Look for an existing conversation in this account, oldest-first.
   //
@@ -1104,6 +1108,7 @@ async function findOrCreateConversation(
     .select('*')
     .eq('account_id', accountId)
     .eq('contact_id', contactId)
+    .eq('whatsapp_config_id', whatsappConfigId)
     .order('created_at', { ascending: true })
     .limit(1);
 
@@ -1124,6 +1129,7 @@ async function findOrCreateConversation(
       account_id: accountId,
       user_id: configOwnerUserId,
       contact_id: contactId,
+      whatsapp_config_id: whatsappConfigId,
     })
     .select()
     .single();
@@ -1139,6 +1145,7 @@ async function findOrCreateConversation(
         .select('*')
         .eq('account_id', accountId)
         .eq('contact_id', contactId)
+        .eq('whatsapp_config_id', whatsappConfigId)
         .order('created_at', { ascending: true })
         .limit(1);
       if (raced && raced.length > 0) {

@@ -169,6 +169,11 @@ export interface Conversation {
   created_at: string;
   updated_at: string;
   contact?: Contact;
+  whatsapp_config_id?: string | null;
+  whatsapp_config?: Pick<
+    WhatsAppConfig,
+    'id' | 'provider' | 'phone_number_id' | 'sender_phone' | 'status'
+  > | null;
   /**
    * AI auto-reply state for this thread (migration 029 + 033):
    *  - `ai_autoreply_disabled` — the bot is paused here (a human took
@@ -253,6 +258,7 @@ export interface Message {
    * badge in the inbox. Migration 033.
    */
   ai_generated?: boolean;
+  provider_error?: string | null;
 }
 
 export type ReactionActor = 'customer' | 'agent';
@@ -267,13 +273,17 @@ export interface MessageReaction {
   created_at: string;
 }
 
+export type WhatsAppProvider = 'meta' | 'twilio';
+
 export interface WhatsAppConfig {
   id: string;
   user_id: string;
   account_id?: string;
-  phone_number_id: string;
+  provider: WhatsAppProvider;
+  phone_number_id?: string | null;
+  sender_phone?: string | null;
   waba_id?: string;
-  access_token: string;
+  access_token?: string | null;
   verify_token?: string;
   status: 'connected' | 'disconnected';
   is_active?: boolean;

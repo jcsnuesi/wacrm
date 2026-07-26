@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('id, account_id, contact:contacts(phone)')
+      .select('id, account_id, whatsapp_config_id, contact:contacts(phone)')
       .eq('id', targetMessage.conversation_id)
       .eq('account_id', accountId)
       .maybeSingle();
@@ -113,14 +113,21 @@ export async function POST(request: Request) {
     // WhatsApp config + access token. Account-scoped post-multi-user.
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
-      .select('phone_number_id, access_token')
+      .select('provider, phone_number_id, access_token')
       .eq('account_id', accountId)
-      .eq('is_active', true)
+      .eq('id', conversation.whatsapp_config_id)
       .single();
 
     if (configError || !config) {
       return NextResponse.json(
         { error: 'WhatsApp not configured.' },
+        { status: 400 }
+      );
+    }
+
+    if (config.provider === 'twilio') {
+      return NextResponse.json(
+        { error: 'Reactions are not supported for Twilio WhatsApp lines.' },
         { status: 400 }
       );
     }

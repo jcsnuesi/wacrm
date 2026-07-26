@@ -177,9 +177,11 @@
     "composer": {
       "draftHint": "Tap the ✨ to draft a reply with AI — you can edit it before sending",
       "sessionExpiredHint": "24-hour session expired. Use a template to re-engage.",
+      "twilioSessionExpiredHint": "24-hour session expired. Approved Twilio templates are not enabled for this line.",
       "templates": "Templates",
       "readOnlyPlaceholder": "Read-only — viewers can browse but not reply",
       "sessionExpiredPlaceholder": "Session expired - use a template",
+      "twilioSessionExpiredPlaceholder": "Session expired - wait for the customer to message again",
       "typeMessagePlaceholder": "Type a message... (Shift+Enter for new line)",
       "readOnlyTitle": "Read-only — your role can't send messages",
       "recording": "Recording… {current} / {max}",

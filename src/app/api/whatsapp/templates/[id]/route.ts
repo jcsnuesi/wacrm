@@ -148,6 +148,7 @@ export async function PATCH(
         .from('whatsapp_config')
         .select('*')
         .eq('account_id', accountId)
+        .eq('provider', 'meta')
         .eq('is_active', true)
         .single();
       if (configError || !config) {
@@ -295,6 +296,7 @@ export async function DELETE(
         .from('whatsapp_config')
         .select('*')
         .eq('account_id', accountId)
+        .eq('provider', 'meta')
         .eq('is_active', true)
         .single();
       if (configError || !config || !config.waba_id) {

@@ -44,7 +44,9 @@ type ResetReason = 'token_corrupted' | 'meta_api_error' | null;
 
 type ConfigListItem = {
   id: string;
-  phone_number_id: string;
+  provider?: 'meta' | 'twilio';
+  phone_number_id?: string | null;
+  sender_phone?: string | null;
   waba_id?: string | null;
   status?: 'connected' | 'disconnected';
   connected_at?: string | null;
@@ -91,6 +93,8 @@ export function WhatsAppConfig() {
   const loadedAccountIdRef = useRef<string | null>(null);
 
   const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [provider, setProvider] = useState<'meta' | 'twilio'>('meta');
+  const [senderPhone, setSenderPhone] = useState('');
   const [wabaId, setWabaId] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [verifyToken, setVerifyToken] = useState('');
@@ -118,7 +122,9 @@ export function WhatsAppConfig() {
 
   const webhookUrl =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/api/whatsapp/webhook`
+      ? provider === 'twilio'
+        ? `${window.location.origin}/api/whatsapp/webhook/twilio/inbound`
+        : `${window.location.origin}/api/whatsapp/webhook`
       : '';
 
   const fetchConfig = useCallback(
@@ -159,7 +165,9 @@ export function WhatsAppConfig() {
 
         if (selected) {
           setConfig((selected as unknown as WhatsAppConfigType) ?? null);
+          setProvider(selected.provider === 'twilio' ? 'twilio' : 'meta');
           setPhoneNumberId(selected.phone_number_id || '');
+          setSenderPhone(selected.sender_phone || '');
           setWabaId(selected.waba_id || '');
           setAccessToken(MASKED_TOKEN);
           setVerifyToken('');
@@ -168,7 +176,9 @@ export function WhatsAppConfig() {
           setIsCreateMode(false);
         } else {
           setConfig(null);
+          setProvider('meta');
           setPhoneNumberId('');
+          setSenderPhone('');
           setWabaId('');
           setAccessToken('');
           setVerifyToken('');
@@ -259,11 +269,22 @@ export function WhatsAppConfig() {
   }, [authLoading, profileLoading, user?.id, accountId, fetchConfig]);
 
   async function handleSave() {
-    if (!phoneNumberId.trim()) {
+    if (
+      provider === 'twilio' &&
+      !/^\+[1-9]\d{7,14}$/.test(senderPhone.trim())
+    ) {
+      toast.error('Enter the Twilio WhatsApp sender in E.164 format');
+      return;
+    }
+    if (provider === 'meta' && !phoneNumberId.trim()) {
       toast.error('Phone Number ID is required');
       return;
     }
-    if (!config && (!accessToken.trim() || !tokenEdited)) {
+    if (
+      provider === 'meta' &&
+      !config &&
+      (!accessToken.trim() || !tokenEdited)
+    ) {
       toast.error('Access Token is required for initial setup');
       return;
     }
@@ -276,7 +297,9 @@ export function WhatsAppConfig() {
       // and writing direct to Supabase stores the token in plaintext,
       // which then fails decryption on every subsequent health check.
       const payload: Record<string, unknown> = {
+        provider,
         phone_number_id: phoneNumberId.trim(),
+        sender_phone: senderPhone.trim() || null,
         waba_id: wabaId.trim() || null,
         verify_token: verifyToken.trim() || null,
         config_id: isCreateMode ? 'new' : activeConfigId,
@@ -288,7 +311,13 @@ export function WhatsAppConfig() {
         pin: pin.trim() || null,
       };
 
-      if (tokenEdited && accessToken !== MASKED_TOKEN && accessToken.trim()) {
+      if (provider === 'twilio') {
+        // Credentials stay in server environment variables.
+      } else if (
+        tokenEdited &&
+        accessToken !== MASKED_TOKEN &&
+        accessToken.trim()
+      ) {
         payload.access_token = accessToken.trim();
       } else if (config && !isCreateMode) {
         // Existing config — reuse stored encrypted token by decrypting on the
@@ -464,7 +493,9 @@ export function WhatsAppConfig() {
         'Configuration cleared. You can now re-enter your credentials.'
       );
       setConfig(null);
+      setProvider('meta');
       setPhoneNumberId('');
+      setSenderPhone('');
       setWabaId('');
       setAccessToken('');
       setVerifyToken('');
@@ -488,7 +519,9 @@ export function WhatsAppConfig() {
   function handleNewConfig() {
     setIsCreateMode(true);
     setConfig(null);
+    setProvider('meta');
     setPhoneNumberId('');
+    setSenderPhone('');
     setWabaId('');
     setAccessToken('');
     setVerifyToken('');
@@ -506,7 +539,8 @@ export function WhatsAppConfig() {
     if (!nextConfigId || nextConfigId === activeConfigId) return;
 
     const target = configOptions.find((item) => item.id === nextConfigId);
-    const label = target?.phone_number_id ?? 'the selected line';
+    const label =
+      target?.sender_phone ?? target?.phone_number_id ?? 'the selected line';
     const ok = confirm(
       `Do you want to switch the active WhatsApp line to ${label}?`
     );
@@ -623,7 +657,7 @@ export function WhatsAppConfig() {
             without a successful /register call the number won't
             receive inbound events. Surface this dimension separately
             so users don't trust a misleading green banner. */}
-          {config && (
+          {config && provider === 'meta' && (
             <Alert
               className={
                 isRegistered
@@ -736,104 +770,140 @@ export function WhatsAppConfig() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  {t('phoneNumberId')}
-                </Label>
-                <Input
-                  placeholder="e.g. 100234567890123"
-                  value={phoneNumberId}
-                  onChange={(e) => setPhoneNumberId(e.target.value)}
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">{t('wabaId')}</Label>
-                <Input
-                  placeholder="e.g. 100234567890456"
-                  value={wabaId}
-                  onChange={(e) => setWabaId(e.target.value)}
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  {t('accessToken')}
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showToken ? 'text' : 'password'}
-                    placeholder={t('accessTokenPlaceholder')}
-                    value={accessToken}
-                    onChange={(e) => {
-                      setAccessToken(e.target.value);
-                      setTokenEdited(true);
-                    }}
-                    onFocus={() => {
-                      if (accessToken === MASKED_TOKEN) {
-                        setAccessToken('');
-                        setTokenEdited(true);
-                      }
-                    }}
-                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowToken(!showToken)}
-                    className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 transition-colors"
-                  >
-                    {showToken ? (
-                      <EyeOff className="size-4" />
-                    ) : (
-                      <Eye className="size-4" />
-                    )}
-                  </button>
-                </div>
-                {config && !tokenEdited && (
-                  <p className="text-muted-foreground text-xs">
-                    {t('tokenHidden')}
-                  </p>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  {t('webhookVerifyToken')}
-                </Label>
-                <Input
-                  placeholder={t('webhookVerifyTokenPlaceholder')}
-                  value={verifyToken}
-                  onChange={(e) => setVerifyToken(e.target.value)}
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
-                />
-                <p className="text-muted-foreground text-xs">
-                  {t('webhookVerifyTokenHint')}
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  {t('twoStepPin')}
-                  <span className="text-muted-foreground ml-1">
-                    {t('optional')}
-                  </span>
-                </Label>
-                <Input
-                  type="text"
-                  inputMode="numeric"
-                  maxLength={6}
-                  placeholder={t('pinPlaceholder')}
-                  value={pin}
-                  onChange={(e) =>
-                    setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                <Label className="text-muted-foreground">Provider</Label>
+                <select
+                  value={provider}
+                  onChange={(event) =>
+                    setProvider(event.target.value as 'meta' | 'twilio')
                   }
-                  className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
-                />
-                <p className="text-muted-foreground text-xs leading-relaxed">
-                  <span>{t('pinHint')}</span>
-                </p>
+                  className="bg-muted border-border text-foreground h-10 w-full rounded-md border px-3 text-sm"
+                >
+                  <option value="meta">Meta Cloud API</option>
+                  <option value="twilio">Twilio WhatsApp</option>
+                </select>
               </div>
+
+              {provider === 'twilio' ? (
+                <div className="space-y-2">
+                  <Label className="text-muted-foreground">
+                    Twilio WhatsApp sender
+                  </Label>
+                  <Input
+                    placeholder="e.g. +14155550123"
+                    value={senderPhone}
+                    onChange={(e) => setSenderPhone(e.target.value)}
+                    className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                  />
+                  <p className="text-muted-foreground text-xs">
+                    Credentials are read from TWILIO_ACCOUNT_SID and
+                    TWILIO_AUTH_TOKEN on the server.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('phoneNumberId')}
+                    </Label>
+                    <Input
+                      placeholder="e.g. 100234567890123"
+                      value={phoneNumberId}
+                      onChange={(e) => setPhoneNumberId(e.target.value)}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('wabaId')}
+                    </Label>
+                    <Input
+                      placeholder="e.g. 100234567890456"
+                      value={wabaId}
+                      onChange={(e) => setWabaId(e.target.value)}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('accessToken')}
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        type={showToken ? 'text' : 'password'}
+                        placeholder={t('accessTokenPlaceholder')}
+                        value={accessToken}
+                        onChange={(e) => {
+                          setAccessToken(e.target.value);
+                          setTokenEdited(true);
+                        }}
+                        onFocus={() => {
+                          if (accessToken === MASKED_TOKEN) {
+                            setAccessToken('');
+                            setTokenEdited(true);
+                          }
+                        }}
+                        className="bg-muted border-border text-foreground placeholder:text-muted-foreground pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowToken(!showToken)}
+                        className="text-muted-foreground hover:text-foreground absolute top-1/2 right-2 -translate-y-1/2 transition-colors"
+                      >
+                        {showToken ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
+                      </button>
+                    </div>
+                    {config && !tokenEdited && (
+                      <p className="text-muted-foreground text-xs">
+                        {t('tokenHidden')}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('webhookVerifyToken')}
+                    </Label>
+                    <Input
+                      placeholder={t('webhookVerifyTokenPlaceholder')}
+                      value={verifyToken}
+                      onChange={(e) => setVerifyToken(e.target.value)}
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground"
+                    />
+                    <p className="text-muted-foreground text-xs">
+                      {t('webhookVerifyTokenHint')}
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      {t('twoStepPin')}
+                      <span className="text-muted-foreground ml-1">
+                        {t('optional')}
+                      </span>
+                    </Label>
+                    <Input
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={6}
+                      placeholder={t('pinPlaceholder')}
+                      value={pin}
+                      onChange={(e) =>
+                        setPin(e.target.value.replace(/\D/g, '').slice(0, 6))
+                      }
+                      className="bg-muted border-border text-foreground placeholder:text-muted-foreground tracking-widest"
+                    />
+                    <p className="text-muted-foreground text-xs leading-relaxed">
+                      <span>{t('pinHint')}</span>
+                    </p>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -993,21 +1063,27 @@ export function WhatsAppConfig() {
                       <li>
                         {t.rich('step3_2', {
                           strong: (chunks) => (
-                            <strong className="text-foreground">{chunks}</strong>
+                            <strong className="text-foreground">
+                              {chunks}
+                            </strong>
                           ),
                         })}
                       </li>
                       <li>
                         {t.rich('step3_3', {
                           strong: (chunks) => (
-                            <strong className="text-foreground">{chunks}</strong>
+                            <strong className="text-foreground">
+                              {chunks}
+                            </strong>
                           ),
                         })}
                       </li>
                       <li>
                         {t.rich('step3_4', {
                           strong: (chunks) => (
-                            <strong className="text-foreground">{chunks}</strong>
+                            <strong className="text-foreground">
+                              {chunks}
+                            </strong>
                           ),
                         })}
                       </li>
@@ -1031,14 +1107,18 @@ export function WhatsAppConfig() {
                       <li>
                         {t.rich('step4_3', {
                           strong: (chunks) => (
-                            <strong className="text-foreground">{chunks}</strong>
+                            <strong className="text-foreground">
+                              {chunks}
+                            </strong>
                           ),
                         })}
                       </li>
                       <li>
                         {t.rich('step4_4', {
                           strong: (chunks) => (
-                            <strong className="text-foreground">{chunks}</strong>
+                            <strong className="text-foreground">
+                              {chunks}
+                            </strong>
                           ),
                         })}
                       </li>

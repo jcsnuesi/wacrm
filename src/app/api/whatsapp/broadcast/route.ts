@@ -138,6 +138,7 @@ export async function POST(request: Request) {
       .from('whatsapp_config')
       .select('*')
       .eq('account_id', accountId)
+      .eq('provider', 'meta')
       .eq('is_active', true)
       .single();
 

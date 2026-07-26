@@ -7,6 +7,7 @@ import {
   verifyPhoneNumber,
 } from '@/lib/whatsapp/meta-api';
 import { encrypt, decrypt } from '@/lib/whatsapp/encryption';
+import { verifyTwilioSender } from '@/lib/whatsapp/twilio-api';
 
 /**
  * Resolve the caller's account_id from their profile. Inlined here
@@ -35,9 +36,11 @@ interface WhatsAppConfigRow {
   id: string;
   account_id: string;
   user_id: string;
-  phone_number_id: string;
+  provider: 'meta' | 'twilio';
+  phone_number_id: string | null;
+  sender_phone: string | null;
   waba_id: string | null;
-  access_token: string;
+  access_token: string | null;
   verify_token: string | null;
   status: 'connected' | 'disconnected';
   connected_at: string | null;
@@ -51,7 +54,13 @@ interface WhatsAppConfigRow {
 
 type ActiveWhatsAppConfigRow = Pick<
   WhatsAppConfigRow,
-  'id' | 'phone_number_id' | 'access_token' | 'status' | 'is_active'
+  | 'id'
+  | 'provider'
+  | 'phone_number_id'
+  | 'sender_phone'
+  | 'access_token'
+  | 'status'
+  | 'is_active'
 >;
 
 type ExistingWhatsAppConfigRow = Pick<
@@ -128,6 +137,20 @@ async function ensureSingleActiveConfig(
     .eq('id', fallback.id);
 }
 
+function publicConfig(row: WhatsAppConfigRow, supportsActiveColumn: boolean) {
+  return {
+    id: row.id,
+    provider: row.provider || 'meta',
+    phone_number_id: row.phone_number_id,
+    sender_phone: row.sender_phone,
+    waba_id: row.waba_id,
+    status: row.status,
+    connected_at: row.connected_at,
+    is_active: supportsActiveColumn ? !!row.is_active : true,
+    updated_at: row.updated_at,
+  };
+}
+
 // Lazy-initialised service-role client. We need it to detect a
 // phone_number_id already claimed by a *different* user — under RLS,
 // the user's own session can't see other users' rows, so the conflict
@@ -190,8 +213,8 @@ export async function GET() {
       .from('whatsapp_config')
       .select(
         supportsActiveColumn
-          ? 'id, phone_number_id, access_token, status, is_active'
-          : 'id, phone_number_id, access_token, status'
+          ? 'id, provider, phone_number_id, sender_phone, access_token, status, is_active'
+          : 'id, provider, phone_number_id, sender_phone, access_token, status'
       )
       .eq('account_id', accountId);
 
@@ -231,10 +254,38 @@ export async function GET() {
       );
     }
 
-    // Try to decrypt the stored token with the current ENCRYPTION_KEY.
+    if (config.provider === 'twilio') {
+      try {
+        const phoneInfo = await verifyTwilioSender(config.sender_phone || '');
+        return NextResponse.json({
+          connected: true,
+          provider: 'twilio',
+          phone_info: phoneInfo,
+          active_config_id: config.id,
+          configs: configs.map((row) =>
+            publicConfig(row, supportsActiveColumn)
+          ),
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return NextResponse.json({
+          connected: false,
+          provider: 'twilio',
+          reason: 'twilio_api_error',
+          message: `Twilio rejected the configuration: ${message}`,
+          active_config_id: config.id,
+          configs: configs.map((row) =>
+            publicConfig(row, supportsActiveColumn)
+          ),
+        });
+      }
+    }
+
+    // Try to decrypt the stored Meta token with the current ENCRYPTION_KEY.
     // If this fails, the key changed (or was never consistent across envs).
     let accessToken: string;
     try {
+      if (!config.access_token) throw new Error('Meta access token is missing');
       accessToken = decrypt(config.access_token);
     } catch (err) {
       console.error('[whatsapp/config GET] Token decryption failed:', err);
@@ -246,15 +297,9 @@ export async function GET() {
           message:
             'The stored access token cannot be decrypted with the current ENCRYPTION_KEY. This usually means the key changed, or it differs between environments (local vs Hostinger vs Vercel). Click "Reset Configuration" below, then re-save.',
           active_config_id: config.id,
-          configs: configs.map((row) => ({
-            id: row.id,
-            phone_number_id: row.phone_number_id,
-            waba_id: row.waba_id,
-            status: row.status,
-            connected_at: row.connected_at,
-            is_active: supportsActiveColumn ? !!row.is_active : true,
-            updated_at: row.updated_at,
-          })),
+          configs: configs.map((row) =>
+            publicConfig(row, supportsActiveColumn)
+          ),
         },
         { status: 200 }
       );
@@ -263,22 +308,14 @@ export async function GET() {
     // Validate credentials against Meta
     try {
       const phoneInfo = await verifyPhoneNumber({
-        phoneNumberId: config.phone_number_id,
+        phoneNumberId: config.phone_number_id!,
         accessToken,
       });
       return NextResponse.json({
         connected: true,
         phone_info: phoneInfo,
         active_config_id: config.id,
-        configs: configs.map((row) => ({
-          id: row.id,
-          phone_number_id: row.phone_number_id,
-          waba_id: row.waba_id,
-          status: row.status,
-          connected_at: row.connected_at,
-          is_active: supportsActiveColumn ? !!row.is_active : true,
-          updated_at: row.updated_at,
-        })),
+        configs: configs.map((row) => publicConfig(row, supportsActiveColumn)),
       });
     } catch (err) {
       const message =
@@ -293,15 +330,9 @@ export async function GET() {
           reason: 'meta_api_error',
           message: `Meta API rejected the credentials: ${message}`,
           active_config_id: config.id,
-          configs: configs.map((row) => ({
-            id: row.id,
-            phone_number_id: row.phone_number_id,
-            waba_id: row.waba_id,
-            status: row.status,
-            connected_at: row.connected_at,
-            is_active: supportsActiveColumn ? !!row.is_active : true,
-            updated_at: row.updated_at,
-          })),
+          configs: configs.map((row) =>
+            publicConfig(row, supportsActiveColumn)
+          ),
         },
         { status: 200 }
       );
@@ -346,7 +377,9 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const {
+      provider,
       phone_number_id,
+      sender_phone,
       waba_id,
       access_token,
       verify_token,
@@ -358,6 +391,7 @@ export async function POST(request: Request) {
 
     const createMode = mode === 'create' || config_id === 'new';
     const activateMode = mode === 'activate';
+    const requestedProvider = provider === 'twilio' ? 'twilio' : 'meta';
 
     if (activateMode) {
       if (!supportsActiveColumn) {
@@ -471,6 +505,138 @@ export async function POST(request: Request) {
         },
         { status: 409 }
       );
+    }
+
+    if (requestedProvider === 'twilio') {
+      if (
+        typeof sender_phone !== 'string' ||
+        !/^\+[1-9]\d{7,14}$/.test(sender_phone.trim())
+      ) {
+        return NextResponse.json(
+          {
+            error:
+              'sender_phone must be a valid E.164 number, for example +14155550123.',
+          },
+          { status: 400 }
+        );
+      }
+      const senderPhone = sender_phone.trim();
+      const { data: claimed, error: claimedError } = await supabaseAdmin()
+        .from('whatsapp_config')
+        .select('account_id')
+        .eq('provider', 'twilio')
+        .eq('sender_phone', senderPhone)
+        .neq('account_id', accountId)
+        .maybeSingle();
+      if (claimedError) {
+        return NextResponse.json(
+          { error: 'Failed to validate Twilio sender ownership.' },
+          { status: 500 }
+        );
+      }
+      if (claimed) {
+        return NextResponse.json(
+          {
+            error:
+              'This Twilio WhatsApp sender is already linked to another account.',
+          },
+          { status: 409 }
+        );
+      }
+
+      let phoneInfo: { senderPhone: string };
+      try {
+        phoneInfo = await verifyTwilioSender(senderPhone);
+      } catch (err) {
+        return NextResponse.json(
+          {
+            error: `Twilio API error: ${err instanceof Error ? err.message : String(err)}`,
+          },
+          { status: 400 }
+        );
+      }
+
+      let existingQuery = supabase
+        .from('whatsapp_config')
+        .select('id, is_active')
+        .eq('account_id', accountId);
+      existingQuery =
+        typeof config_id === 'string' && config_id && config_id !== 'new'
+          ? existingQuery.eq('id', config_id)
+          : existingQuery
+              .eq('provider', 'twilio')
+              .eq('sender_phone', senderPhone);
+      const { data: existingTwilio, error: existingTwilioError } =
+        await existingQuery.maybeSingle();
+      if (existingTwilioError) {
+        return NextResponse.json(
+          { error: 'Failed to load current configuration.' },
+          { status: 500 }
+        );
+      }
+
+      if (
+        supportsActiveColumn &&
+        (activate === true || createMode || !existingTwilio)
+      ) {
+        await supabase
+          .from('whatsapp_config')
+          .update({ is_active: false })
+          .eq('account_id', accountId);
+      }
+
+      const row = {
+        provider: 'twilio',
+        sender_phone: senderPhone,
+        phone_number_id: null,
+        waba_id: null,
+        access_token: null,
+        verify_token: null,
+        status: 'connected',
+        connected_at: new Date().toISOString(),
+        registered_at: null,
+        subscribed_apps_at: null,
+        last_registration_error: null,
+        updated_at: new Date().toISOString(),
+      };
+      const mutation = existingTwilio
+        ? supabase
+            .from('whatsapp_config')
+            .update({
+              ...row,
+              ...(supportsActiveColumn
+                ? {
+                    is_active:
+                      activate === false
+                        ? false
+                        : (existingTwilio.is_active ?? true),
+                  }
+                : {}),
+            })
+            .eq('id', existingTwilio.id)
+        : supabase.from('whatsapp_config').insert({
+            ...row,
+            account_id: accountId,
+            user_id: user.id,
+            ...(supportsActiveColumn
+              ? { is_active: activate === false ? false : true }
+              : {}),
+          });
+      const { error: saveError } = await mutation;
+      if (saveError) {
+        console.error('Error saving Twilio config:', saveError);
+        return NextResponse.json(
+          { error: 'Failed to save Twilio configuration.' },
+          { status: 500 }
+        );
+      }
+      await ensureSingleActiveConfig(supabase, accountId, supportsActiveColumn);
+      return NextResponse.json({
+        success: true,
+        saved: true,
+        provider: 'twilio',
+        phone_info: phoneInfo,
+      });
     }
 
     if (!access_token || !phone_number_id) {
@@ -663,6 +829,8 @@ export async function POST(request: Request) {
     // store the credentials and the error so the UI can guide the
     // user through a retry.
     const baseRow = {
+      provider: 'meta',
+      sender_phone: null,
       phone_number_id,
       waba_id: waba_id || null,
       access_token: encryptedAccessToken,
@@ -801,6 +969,39 @@ export async function DELETE(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const targetConfigId = searchParams.get('config_id');
+
+    let protectedConfigId = targetConfigId;
+    if (!protectedConfigId && supportsActiveColumn) {
+      const { data: active } = await supabase
+        .from('whatsapp_config')
+        .select('id')
+        .eq('account_id', accountId)
+        .eq('is_active', true)
+        .maybeSingle();
+      protectedConfigId = active?.id ?? null;
+    }
+    if (protectedConfigId) {
+      const { count, error: countError } = await supabase
+        .from('conversations')
+        .select('id', { count: 'exact', head: true })
+        .eq('account_id', accountId)
+        .eq('whatsapp_config_id', protectedConfigId);
+      if (countError) {
+        return NextResponse.json(
+          { error: 'Failed to validate line usage' },
+          { status: 500 }
+        );
+      }
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'This WhatsApp line is used by existing conversations and cannot be deleted. Disconnect it instead.',
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     const deleteQuery = supabase
       .from('whatsapp_config')

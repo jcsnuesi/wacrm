@@ -143,7 +143,13 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
     !profileLoading && !!account?.name && account.name !== profile?.full_name;
   const canSwitchAccounts = availableAccounts.length > 1;
   const [whatsappConfigs, setWhatsappConfigs] = useState<
-    Array<{ id: string; phone_number_id: string; is_active?: boolean }>
+    Array<{
+      id: string;
+      provider?: 'meta' | 'twilio';
+      phone_number_id?: string | null;
+      sender_phone?: string | null;
+      is_active?: boolean;
+    }>
   >([]);
   const [activeWhatsappConfigId, setActiveWhatsappConfigId] =
     useState<string>('');
@@ -166,7 +172,9 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       const payload = (await res.json().catch(() => null)) as {
         configs?: Array<{
           id: string;
-          phone_number_id: string;
+          provider?: 'meta' | 'twilio';
+          phone_number_id?: string | null;
+          sender_phone?: string | null;
           is_active?: boolean;
         }>;
         active_config_id?: string;
@@ -198,7 +206,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
       onClose?.();
       return;
     }
-    const label = target?.phone_number_id ?? 'the selected line';
+    const label =
+      target?.sender_phone ?? target?.phone_number_id ?? 'the selected line';
     const ok = confirm(
       `Do you want to switch the active WhatsApp line to ${label}?`
     );
@@ -419,7 +428,8 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 <SelectContent>
                   {whatsappConfigs.map((item) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {item.phone_number_id}
+                      {item.provider === 'twilio' ? 'Twilio · ' : 'Meta · '}
+                      {item.sender_phone ?? item.phone_number_id}
                       {item.is_active ? ' (active)' : ''}
                     </SelectItem>
                   ))}

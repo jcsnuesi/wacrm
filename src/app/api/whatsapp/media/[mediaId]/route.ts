@@ -45,12 +45,32 @@ export async function GET(
       );
     }
 
-    // Fetch and decrypt WhatsApp config
+    // Resolve the line from the message that owns this media. Using the
+    // currently active line would break historical media after an account
+    // switches between Meta and Twilio (or between two Meta numbers).
+    const { data: mediaMessages } = await supabase
+      .from('messages')
+      .select('conversation_id')
+      .eq('media_url', `/api/whatsapp/media/${mediaId}`)
+      .limit(1);
+    const conversationId = mediaMessages?.[0]?.conversation_id;
+    if (!conversationId) {
+      return NextResponse.json({ error: 'Media not found' }, { status: 404 });
+    }
+    const { data: conversation } = await supabase
+      .from('conversations')
+      .select('whatsapp_config_id')
+      .eq('id', conversationId)
+      .eq('account_id', accountId)
+      .maybeSingle();
+
+    // Fetch and decrypt the owning Meta config.
     const { data: config, error: configError } = await supabase
       .from('whatsapp_config')
       .select('*')
       .eq('account_id', accountId)
-      .eq('is_active', true)
+      .eq('id', conversation?.whatsapp_config_id)
+      .eq('provider', 'meta')
       .single();
 
     if (configError || !config) {

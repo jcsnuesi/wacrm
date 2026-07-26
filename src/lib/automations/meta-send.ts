@@ -138,6 +138,7 @@ async function sendViaMeta(
     .from('whatsapp_config')
     .select('*')
     .eq('account_id', input.accountId)
+    .eq('provider', 'meta')
     .eq('is_active', true)
     .single();
   if (configErr || !config) {
