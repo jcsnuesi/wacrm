@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { decrypt } from '@/lib/whatsapp/encryption';
 import { normalizeStatus } from '@/lib/whatsapp/template-status-normalize';
+import { findMetaTemplateConfig } from '@/lib/whatsapp/meta-template-config';
 import type { TemplateButton, TemplateSampleValues } from '@/types';
 
 /**
@@ -17,7 +18,7 @@ import type { TemplateButton, TemplateSampleValues } from '@/types';
  * they remain visible so the user can notice drift and clean up.
  */
 
-const META_API_VERSION = 'v21.0';
+const META_API_VERSION = 'v25.0';
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
 
 interface MetaButton {
@@ -152,19 +153,16 @@ export async function POST() {
       );
     }
 
-    const { data: config, error: configError } = await supabase
-      .from('whatsapp_config')
-      .select('*')
-      .eq('account_id', accountId)
-      .eq('provider', 'meta')
-      .eq('is_active', true)
-      .single();
+    const { data: config, error: configError } = await findMetaTemplateConfig(
+      supabase,
+      accountId
+    );
 
     if (configError || !config) {
       return NextResponse.json(
         {
           error:
-            'WhatsApp not configured. Connect your WhatsApp Business account in Settings first.',
+            'No connected Meta WhatsApp line was found. Connect a Meta line in Settings first.',
         },
         { status: 400 }
       );

@@ -44,6 +44,7 @@ import {
 } from '@/lib/whatsapp/phone-utils';
 import type { MessageTemplate } from '@/types';
 import { isMessageTemplate } from '@/lib/whatsapp/template-row-guard';
+import { TemplateSendValidationError } from '@/lib/whatsapp/template-send-builder';
 import {
   sendTwilioMessage,
   TwilioProviderError,
@@ -543,6 +544,9 @@ export async function sendMessageToConversation(
   } catch (err) {
     const message =
       err instanceof Error ? err.message : `Unknown ${provider} API error`;
+    if (err instanceof TemplateSendValidationError) {
+      throw new SendMessageError('bad_request', message, 400);
+    }
     if (provider === 'twilio') {
       console.error('[send-message] Twilio send failed:', message);
       throw new SendMessageError(

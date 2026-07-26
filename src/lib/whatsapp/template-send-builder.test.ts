@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildSendComponents } from './template-send-builder';
+import {
+  buildSendComponents,
+  TemplateSendValidationError,
+} from './template-send-builder';
 import type { MessageTemplate } from '@/types';
 
 function row(overrides: Partial<MessageTemplate> = {}): MessageTemplate {
@@ -146,7 +149,7 @@ describe('buildSendComponents — header', () => {
   it('throws on media header with no link OR id available', () => {
     expect(() =>
       buildSendComponents(row({ header_type: 'image' })),
-    ).toThrow(/requires a media link or id/);
+    ).toThrow(TemplateSendValidationError);
   });
 });
 

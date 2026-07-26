@@ -270,6 +270,25 @@ describe('POST /api/whatsapp/send — contact_id template path', () => {
     });
   });
 
+  it('passes per-send header media through to Meta templates', async () => {
+    const res = await postContactTemplate({
+      template_message_params: {
+        body: ['Acme', '#1234'],
+        headerMediaUrl: 'https://cdn.example.com/header.jpg',
+      },
+    });
+
+    expect(res.status).toBe(200);
+    const args = (sendTemplateMessage.mock.calls[0] as unknown[])[0] as Record<
+      string,
+      unknown
+    >;
+    expect(args.messageParams).toEqual({
+      body: ['Acme', '#1234'],
+      headerMediaUrl: 'https://cdn.example.com/header.jpg',
+    });
+  });
+
   it('404s when the contact is not in the caller account', async () => {
     contactRow = null;
 

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@/lib/supabase/server';
 import { decrypt } from '@/lib/whatsapp/encryption';
+import { findMetaTemplateConfig } from '@/lib/whatsapp/meta-template-config';
 import { submitMessageTemplate } from '@/lib/whatsapp/meta-api';
 import {
   validateTemplatePayload,
@@ -152,18 +153,15 @@ export async function POST(request: Request) {
       metaTemplateId = `dry-run-${crypto.randomUUID()}`;
       metaStatus = 'PENDING';
     } else {
-      const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('provider', 'meta')
-        .eq('is_active', true)
-        .single();
+      const { data: config, error: configError } = await findMetaTemplateConfig(
+        supabase,
+        accountId
+      );
       if (configError || !config) {
         return NextResponse.json(
           {
             error:
-              'WhatsApp not configured. Connect your WhatsApp Business account in Settings first.',
+              'No connected Meta WhatsApp line was found. Connect a Meta line in Settings first.',
           },
           { status: 400 }
         );

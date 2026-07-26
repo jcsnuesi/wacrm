@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { decrypt } from '@/lib/whatsapp/encryption';
+import { findMetaTemplateConfig } from '@/lib/whatsapp/meta-template-config';
 import {
   deleteMessageTemplate,
   editMessageTemplate,
@@ -144,16 +145,13 @@ export async function PATCH(
     }
 
     if (!isDryRun()) {
-      const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('provider', 'meta')
-        .eq('is_active', true)
-        .single();
+      const { data: config, error: configError } = await findMetaTemplateConfig(
+        supabase,
+        accountId
+      );
       if (configError || !config) {
         return NextResponse.json(
-          { error: 'WhatsApp not configured.' },
+          { error: 'No connected Meta WhatsApp line was found.' },
           { status: 400 }
         );
       }
@@ -292,16 +290,16 @@ export async function DELETE(
     }
 
     if (existing.meta_template_id && !isDryRun()) {
-      const { data: config, error: configError } = await supabase
-        .from('whatsapp_config')
-        .select('*')
-        .eq('account_id', accountId)
-        .eq('provider', 'meta')
-        .eq('is_active', true)
-        .single();
+      const { data: config, error: configError } = await findMetaTemplateConfig(
+        supabase,
+        accountId
+      );
       if (configError || !config || !config.waba_id) {
         return NextResponse.json(
-          { error: 'WhatsApp not configured — cannot delete on Meta.' },
+          {
+            error:
+              'No connected Meta WhatsApp line was found — cannot delete on Meta.',
+          },
           { status: 400 }
         );
       }

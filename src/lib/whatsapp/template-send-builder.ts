@@ -51,6 +51,14 @@ export interface SendTimeParams {
   buttonParams?: Record<number, string>;
 }
 
+/** Missing per-send values are request errors, not provider outages. */
+export class TemplateSendValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'TemplateSendValidationError';
+  }
+}
+
 export type MetaSendComponent =
   | { type: 'header'; parameters: MetaSendParameter[] }
   | { type: 'body'; parameters: MetaSendParameter[] }
@@ -84,7 +92,7 @@ function buildHeaderComponent(
     if (varCount === 0) return null;
     const value = params.headerText;
     if (!value || !value.trim()) {
-      throw new Error(
+      throw new TemplateSendValidationError(
         'Header text variable {{1}} requires a value — pass headerText.',
       );
     }
@@ -106,7 +114,7 @@ function buildHeaderComponent(
   const link = params.headerMediaUrl ?? template.header_media_url;
   const id = params.headerMediaId;
   if (!link && !id) {
-    throw new Error(
+    throw new TemplateSendValidationError(
       `${headerType} header requires a media link or id at send time — set header_media_url on the template or pass headerMediaUrl/headerMediaId.`,
     );
   }
@@ -131,7 +139,7 @@ function buildBodyComponent(
   const body = params.body ?? [];
   if (varCount === 0 && body.length === 0) return null;
   if (body.length < varCount) {
-    throw new Error(
+    throw new TemplateSendValidationError(
       `Body has ${varCount} variable(s) but only ${body.length} value(s) were supplied.`,
     );
   }
@@ -174,7 +182,7 @@ function buildButtonComponent(
       // Each URL button is its own component with sub_type=url and
       // the button's index in the template's buttons array.
       if (!override || !override.trim()) {
-        throw new Error(
+        throw new TemplateSendValidationError(
           `URL button #${index + 1} uses {{1}} — requires a buttonParams[${index}] value.`,
         );
       }

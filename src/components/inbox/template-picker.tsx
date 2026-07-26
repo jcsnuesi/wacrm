@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { MessageTemplate } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -20,13 +20,19 @@ import {
   ChevronRight,
   LayoutTemplate,
   Loader2,
+  Upload,
 } from "lucide-react";
 import { extractVariableIndices } from "@/lib/whatsapp/template-validators";
+import {
+  MEDIA_MAX_BYTES_BY_KIND,
+  uploadAccountMedia,
+} from "@/lib/storage/upload-media";
 import { useTranslations } from "next-intl";
 
 export interface TemplateSendValues {
   body: string[];
   headerText?: string;
+  headerMediaUrl?: string;
   buttonParams?: Record<number, string>;
 }
 
@@ -48,6 +54,27 @@ interface UrlButtonSlot {
   index: number;
   text: string;
   url: string;
+}
+
+type MediaHeaderType = "image" | "video" | "document";
+
+function getMediaHeaderType(
+  template: MessageTemplate,
+): MediaHeaderType | null {
+  return template.header_type === "image" ||
+    template.header_type === "video" ||
+    template.header_type === "document"
+    ? template.header_type
+    : null;
+}
+
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -86,7 +113,11 @@ export function TemplatePicker({
   const [selected, setSelected] = useState<MessageTemplate | null>(null);
   const [params, setParams] = useState<string[]>([]);
   const [headerText, setHeaderText] = useState<string>("");
+  const [headerMediaUrl, setHeaderMediaUrl] = useState("");
+  const [uploadingHeader, setUploadingHeader] = useState(false);
+  const [mediaError, setMediaError] = useState("");
   const [buttonParams, setButtonParams] = useState<Record<number, string>>({});
+  const headerFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -136,6 +167,9 @@ export function TemplatePicker({
     setSelected(null);
     setParams([]);
     setHeaderText("");
+    setHeaderMediaUrl("");
+    setUploadingHeader(false);
+    setMediaError("");
     setButtonParams({});
   }
 
@@ -149,7 +183,8 @@ export function TemplatePicker({
     const noInputsNeeded =
       slots.bodyVars.length === 0 &&
       slots.headerVarCount === 0 &&
-      slots.urlButtonSlots.length === 0;
+      slots.urlButtonSlots.length === 0 &&
+      getMediaHeaderType(template) === null;
     if (noInputsNeeded) {
       onSelect(template, { body: [] });
       handleOpenChange(false);
@@ -158,13 +193,47 @@ export function TemplatePicker({
     setSelected(template);
     setParams(new Array(slots.bodyVars.length).fill(""));
     setHeaderText("");
+    setHeaderMediaUrl(template.header_media_url ?? "");
+    setMediaError("");
     setButtonParams({});
+  }
+
+  async function handleHeaderMediaFile(file: File) {
+    if (!selected) return;
+    const kind = getMediaHeaderType(selected);
+    if (!kind) return;
+
+    if (kind === "image" && !["image/jpeg", "image/png"].includes(file.type)) {
+      setMediaError(t("mediaImageTypeError"));
+      return;
+    }
+    const maxBytes = MEDIA_MAX_BYTES_BY_KIND[kind];
+    if (file.size > maxBytes) {
+      setMediaError(
+        t("mediaTooLarge", { size: Math.round(maxBytes / 1024 / 1024) }),
+      );
+      return;
+    }
+
+    setUploadingHeader(true);
+    setMediaError("");
+    try {
+      const { publicUrl } = await uploadAccountMedia("chat-media", file);
+      setHeaderMediaUrl(publicUrl);
+    } catch (error) {
+      setMediaError(
+        error instanceof Error ? error.message : t("mediaUploadFailed"),
+      );
+    } finally {
+      setUploadingHeader(false);
+    }
   }
 
   function confirm() {
     if (!selected) return;
     const values: TemplateSendValues = { body: params };
     if (headerText.trim()) values.headerText = headerText.trim();
+    if (headerMediaUrl.trim()) values.headerMediaUrl = headerMediaUrl.trim();
     if (Object.keys(buttonParams).length > 0) {
       values.buttonParams = Object.fromEntries(
         Object.entries(buttonParams).map(([k, v]) => [Number(k), v.trim()]),
@@ -178,11 +247,14 @@ export function TemplatePicker({
     () => (selected ? collectVariableSlots(selected) : null),
     [selected],
   );
+  const selectedMediaHeader = selected ? getMediaHeaderType(selected) : null;
   const canConfirm =
     !!selected &&
     !!slots &&
     slots.bodyVars.every((_, i) => (params[i] ?? "").trim().length > 0) &&
     (slots.headerVarCount === 0 || headerText.trim().length > 0) &&
+    (!selectedMediaHeader || isHttpUrl(headerMediaUrl.trim())) &&
+    !uploadingHeader &&
     slots.urlButtonSlots.every(
       (s) => (buttonParams[s.index] ?? "").trim().length > 0,
     );
@@ -272,6 +344,71 @@ export function TemplatePicker({
                   placeholder={t("headerValuePlaceholder")}
                   className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
                 />
+              </div>
+            )}
+            {selectedMediaHeader && (
+              <div className="space-y-2">
+                <Label className="text-xs text-popover-foreground">
+                  {t("mediaHeaderLabel", { type: selectedMediaHeader })}
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="url"
+                    value={headerMediaUrl}
+                    onChange={(e) => {
+                      setHeaderMediaUrl(e.target.value);
+                      setMediaError("");
+                    }}
+                    placeholder={t("mediaUrlPlaceholder")}
+                    className="border-border bg-muted text-foreground placeholder:text-muted-foreground"
+                  />
+                  <input
+                    ref={headerFileRef}
+                    type="file"
+                    className="hidden"
+                    accept={
+                      selectedMediaHeader === "image"
+                        ? "image/jpeg,image/png"
+                        : selectedMediaHeader === "video"
+                          ? "video/mp4,video/3gpp"
+                          : "application/pdf,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt"
+                    }
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) void handleHeaderMediaFile(file);
+                      e.currentTarget.value = "";
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={uploadingHeader}
+                    onClick={() => headerFileRef.current?.click()}
+                    className="shrink-0 border-border"
+                  >
+                    {uploadingHeader ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Upload className="h-4 w-4" />
+                    )}
+                    {t(uploadingHeader ? "uploadingMedia" : "uploadMedia")}
+                  </Button>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  {t("mediaHeaderHint")}
+                </p>
+                {mediaError && (
+                  <p className="text-xs text-destructive">{mediaError}</p>
+                )}
+                {selectedMediaHeader === "image" &&
+                  isHttpUrl(headerMediaUrl.trim()) && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={headerMediaUrl.trim()}
+                      alt=""
+                      className="max-h-36 rounded-md border border-border object-contain"
+                    />
+                  )}
               </div>
             )}
             {slots?.bodyVars.map((v, i) => (

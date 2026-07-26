@@ -344,6 +344,7 @@ export function ContactDetailView({
           template_message_params: {
             body: values.body,
             headerText: values.headerText,
+            headerMediaUrl: values.headerMediaUrl,
             buttonParams: values.buttonParams,
           },
           template_params: values.body,
