@@ -13,7 +13,11 @@ vi.mock('twilio', () => ({
   validateRequest,
 }));
 
-import { sendTwilioMessage, validateTwilioWebhook } from './twilio-api';
+import {
+  sendTwilioMessage,
+  validateTwilioWebhook,
+  verifyTwilioSender,
+} from './twilio-api';
 
 function cacheDb() {
   let cachedSid: string | null = null;
@@ -128,6 +132,25 @@ describe('Twilio provider adapter', () => {
       'signature',
       'https://crm.example.com/api/whatsapp/webhook/twilio/inbound',
       { MessageSid: 'SM123' }
+    );
+  });
+
+  it('filters the Senders API by the required WhatsApp channel', async () => {
+    const fetchMock = vi.fn(
+      async (_input: RequestInfo | URL, _init?: RequestInit) =>
+        Response.json({
+          senders: [{ sender_id: 'whatsapp:+14155550199' }],
+        })
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(verifyTwilioSender('+14155550199')).resolves.toEqual({
+      senderPhone: '+14155550199',
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp&PageSize=100',
+      expect.objectContaining({ cache: 'no-store' })
     );
   });
 });

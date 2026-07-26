@@ -234,7 +234,7 @@ export async function verifyTwilioSender(
   const { accountSid, authToken } = credentials();
   const normalized = whatsappAddress(senderPhone);
   const response = await fetch(
-    'https://messaging.twilio.com/v2/Channels/Senders?PageSize=100',
+    'https://messaging.twilio.com/v2/Channels/Senders?Channel=whatsapp&PageSize=100',
     {
       headers: {
         Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
