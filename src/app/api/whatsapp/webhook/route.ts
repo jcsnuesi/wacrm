@@ -13,6 +13,10 @@ import {
   handleTemplateWebhookChange,
   isTemplateWebhookField,
 } from '@/lib/whatsapp/template-webhook';
+import {
+  formatMetaStatusErrors,
+  type MetaStatusError,
+} from '@/lib/whatsapp/meta-status-error';
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -90,6 +94,7 @@ interface WhatsAppWebhookEntry {
         status: string;
         timestamp: string;
         recipient_id: string;
+        errors?: MetaStatusError[];
       }>;
     };
     field: string;
@@ -374,7 +379,14 @@ async function handleStatusUpdate(status: {
   status: string;
   timestamp: string;
   recipient_id: string;
+  errors?: MetaStatusError[];
 }) {
+  const providerError =
+    status.status === 'failed'
+      ? formatMetaStatusErrors(status.errors) ||
+        'Meta reported that the message could not be delivered.'
+      : null;
+
   // 1) Mirror onto messages (legacy behavior) — Meta's status values
   //    already match the CHECK constraint on messages.status. No
   //    `.select()`: message_id is NOT unique (migration 009 — Meta ids
@@ -382,7 +394,7 @@ async function handleStatusUpdate(status: {
   //    assume a single row.
   const { error: msgErr } = await supabaseAdmin()
     .from('messages')
-    .update({ status: status.status })
+    .update({ status: status.status, provider_error: providerError })
     .eq('message_id', status.id);
 
   if (msgErr) {
@@ -452,6 +464,7 @@ async function handleStatusUpdate(status: {
           whatsapp_message_id: status.id,
           conversation_id: msgRow.conversation_id,
           status: status.status,
+          provider_error: providerError,
         }
       );
     }
