@@ -16,6 +16,8 @@ interface FakeState {
   rpcCalls: string[]
   inserted: Record<string, unknown>[] | null
   deletedFor: string | null
+  countError: { message: string } | null
+  rpcErrors: Record<string, { message: string } | null>
 }
 
 function makeDb() {
@@ -26,10 +28,14 @@ function makeDb() {
     rpcCalls: [],
     inserted: null,
     deletedFor: null,
+    countError: null,
+    rpcErrors: {},
   }
   const db = {
     rpc: (name: string) => {
       state.rpcCalls.push(name)
+      if (state.rpcErrors[name])
+        return Promise.resolve({ data: null, error: state.rpcErrors[name] })
       if (name === 'match_ai_knowledge_semantic')
         return Promise.resolve({ data: state.semantic, error: null })
       if (name === 'match_ai_knowledge_fts')
@@ -39,7 +45,8 @@ function makeDb() {
     from: () => ({
       // retrieveKnowledge's empty-KB count guard.
       select: () => ({
-        eq: () => Promise.resolve({ count: state.chunkCount, error: null }),
+        eq: () =>
+          Promise.resolve({ count: state.chunkCount, error: state.countError }),
       }),
       delete: () => ({
         eq: (_col: string, val: string) => {
@@ -88,6 +95,59 @@ describe('retrieveKnowledge', () => {
     expect(h.embedTexts).not.toHaveBeenCalled()
   })
 
+  it('logs a count query error instead of silently hiding it', async () => {
+    const { db, state } = makeDb()
+    state.countError = { message: 'count denied' }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(
+      await retrieveKnowledge(db, 'acct', { embeddingsApiKey: null }, 'q'),
+    ).toEqual([])
+    expect(log).toHaveBeenCalledWith(
+      '[ai knowledge] chunk count failed:',
+      state.countError,
+    )
+    log.mockRestore()
+  })
+
+  it('logs a lexical RPC error instead of silently hiding it', async () => {
+    const { db, state } = makeDb()
+    state.rpcErrors.match_ai_knowledge_fts = { message: 'rpc denied' }
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(
+      await retrieveKnowledge(db, 'acct', { embeddingsApiKey: null }, 'q'),
+    ).toEqual([])
+    expect(log).toHaveBeenCalledWith(
+      '[ai knowledge] lexical RPC failed:',
+      state.rpcErrors.match_ai_knowledge_fts,
+    )
+    log.mockRestore()
+  })
+
+  it('records an observable no-match result without logging customer text', async () => {
+    const { db } = makeDb()
+    const log = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+
+    expect(
+      await retrieveKnowledge(
+        db,
+        'acct',
+        { embeddingsApiKey: null },
+        'private customer question',
+      ),
+    ).toEqual([])
+    expect(log).toHaveBeenCalledWith(
+      '[ai knowledge] no retrieval matches:',
+      {
+        accountId: 'acct',
+        queryLength: 25,
+        semanticEnabled: false,
+      },
+    )
+    log.mockRestore()
+  })
+
   it('uses semantic search when an embeddings key is present', async () => {
     const { db, state } = makeDb()
     state.semantic = [
@@ -100,6 +160,28 @@ describe('retrieveKnowledge', () => {
     expect(h.embedTexts).toHaveBeenCalledTimes(1)
     // Enough semantic hits → no FTS top-up.
     expect(state.rpcCalls).toEqual(['match_ai_knowledge_semantic'])
+  })
+
+  it('uses lexical results and logs the error when semantic RPC fails', async () => {
+    const { db, state } = makeDb()
+    state.rpcErrors.match_ai_knowledge_semantic = {
+      message: 'vector unavailable',
+    }
+    state.fts = [{ id: 'f1', content: 'Lexical fallback' }]
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+
+    expect(
+      await retrieveKnowledge(db, 'acct', { embeddingsApiKey: 'sk-x' }, 'q'),
+    ).toEqual(['Lexical fallback'])
+    expect(state.rpcCalls).toEqual([
+      'match_ai_knowledge_semantic',
+      'match_ai_knowledge_fts',
+    ])
+    expect(log).toHaveBeenCalledWith(
+      '[ai knowledge] semantic RPC failed:',
+      state.rpcErrors.match_ai_knowledge_semantic,
+    )
+    log.mockRestore()
   })
 
   it('tops up with FTS and dedupes when semantic is short', async () => {

@@ -120,6 +120,21 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     expect(systemPrompt).toContain('Returns accepted within 30 days.')
   })
 
+  it('adds the retrieved address and map URL to the final prompt', async () => {
+    h.retrieveKnowledge.mockResolvedValue([
+      'Estamos detrás del Edificio Acuario, en la avenida 27 de Febrero, entre Núñez de Cáceres y Privada. Google Maps: https://maps.app.goo.gl/wstnrjVxDbobLp7s5',
+    ])
+    await dispatchInboundToAiReply(ARGS)
+
+    const systemPrompt = h.generateReply.mock.calls[0][0].systemPrompt as string
+    expect(systemPrompt).toContain('Edificio Acuario')
+    expect(systemPrompt).toContain('27 de Febrero')
+    expect(systemPrompt).toContain('Núñez de Cáceres')
+    expect(systemPrompt).toContain(
+      'https://maps.app.goo.gl/wstnrjVxDbobLp7s5',
+    )
+  })
+
   it('stands down when an active message-level automation exists', async () => {
     h.state.autoResponders = [{ id: 'auto-1' }]
     await dispatchInboundToAiReply(ARGS)

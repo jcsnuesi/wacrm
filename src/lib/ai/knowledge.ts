@@ -100,12 +100,19 @@ export async function retrieveKnowledge(
       .from('ai_knowledge_chunks')
       .select('id', { count: 'exact', head: true })
       .eq('account_id', accountId)
-    if (error || !count) return []
-  } catch {
+    if (error) {
+      console.error('[ai knowledge] chunk count failed:', error)
+      return []
+    }
+    if (!count) return []
+  } catch (err) {
+    console.error('[ai knowledge] chunk count threw:', err)
     return []
   }
 
   const picked = new Map<string, string>() // id → content, preserves order
+  let semanticResults = 0
+  let lexicalResults = 0
 
   // Semantic path.
   if (config.embeddingsApiKey) {
@@ -117,7 +124,10 @@ export async function retrieveKnowledge(
           p_query_embedding: toVectorLiteral(queryEmbedding),
           p_match_count: k,
         })
-        if (!error && Array.isArray(data)) {
+        if (error) {
+          console.error('[ai knowledge] semantic RPC failed:', error)
+        } else if (Array.isArray(data)) {
+          semanticResults = data.length
           for (const row of data as MatchRow[]) picked.set(row.id, row.content)
         }
       }
@@ -134,7 +144,10 @@ export async function retrieveKnowledge(
         p_query: query,
         p_match_count: k,
       })
-      if (!error && Array.isArray(data)) {
+      if (error) {
+        console.error('[ai knowledge] lexical RPC failed:', error)
+      } else if (Array.isArray(data)) {
+        lexicalResults = data.length
         for (const row of data as MatchRow[]) {
           if (picked.size >= k) break
           if (!picked.has(row.id)) picked.set(row.id, row.content)
@@ -144,6 +157,23 @@ export async function retrieveKnowledge(
       console.error('[ai knowledge] lexical retrieval failed:', err)
     }
   }
+
+  if (picked.size === 0) {
+    console.warn('[ai knowledge] no retrieval matches:', {
+      accountId,
+      queryLength: query.length,
+      semanticEnabled: Boolean(config.embeddingsApiKey),
+    })
+  }
+
+  console.info('[ai knowledge] retrieval completed:', {
+    accountId,
+    queryLength: query.length,
+    semanticResults,
+    lexicalResults,
+    finalChunks: picked.size,
+    chunkIds: Array.from(picked.keys()),
+  })
 
   return Array.from(picked.values()).slice(0, k)
 }
