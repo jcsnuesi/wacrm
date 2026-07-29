@@ -100,10 +100,10 @@ export function PipelineBoard({
       {/* snap-x + snap-mandatory on mobile so swipes land the next
           stage cleanly at the viewport edge instead of mid-column.
           Disabled on lg+ where snapping would interfere with the
-          natural layout. The board can still overflow horizontally on
-          lg+ once a pipeline has many stages (columns keep a 260px
-          min-width), so a thin scrollbar stays visible on desktop. */}
-      <div className="pipeline-scroll flex snap-x snap-mandatory gap-3 overflow-x-auto pb-4 lg:snap-none">
+          natural layout. The board owns both scroll axes so a tall
+          column never pushes the horizontal scrollbar below the visible
+          viewport. */}
+      <div className="pipeline-scroll flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-auto overscroll-contain pb-4 lg:snap-none">
         {sortedStages.map((stage) => {
           const stageDeals = dealsByStage.get(stage.id) ?? [];
           const totalValue = stageDeals.reduce(
@@ -147,21 +147,10 @@ export function PipelineBoard({
       <style jsx>{`
         .pipeline-scroll {
           scroll-behavior: smooth;
+          scrollbar-gutter: stable;
         }
-        /* On touch devices the peek/snap layout already signals there's
-           more to swipe, so the scrollbar is hidden for a clean look.
-           On desktop (mouse) the board can overflow with many stages
-           and there is no peek hint, so keep a thin, themed scrollbar
-           visible to make the overflow discoverable and usable. */
-        @media (hover: none), (pointer: coarse) {
-          .pipeline-scroll::-webkit-scrollbar {
-            height: 0;
-            display: none;
-          }
-          .pipeline-scroll {
-            scrollbar-width: none;
-          }
-        }
+        /* Keep both axes discoverable on desktop. On touch platforms the
+           browser may render overlay scrollbars while swipe remains enabled. */
         @media (hover: hover) and (pointer: fine) {
           .pipeline-scroll {
             scrollbar-width: thin;
@@ -169,6 +158,7 @@ export function PipelineBoard({
           }
           .pipeline-scroll::-webkit-scrollbar {
             height: 8px;
+            width: 8px;
           }
           .pipeline-scroll::-webkit-scrollbar-track {
             background: transparent;
