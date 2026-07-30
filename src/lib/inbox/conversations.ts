@@ -1,5 +1,10 @@
 import type { Conversation, Contact, Tag } from '@/types';
 
+/** Build the Inbox deep-link that opens a specific conversation. */
+export function getConversationHref(conversationId: string): string {
+  return `/inbox?c=${encodeURIComponent(conversationId)}`;
+}
+
 /**
  * Conversation select that embeds the contact plus its tags, so the Inbox
  * can filter conversations by contact tag without a second round-trip.

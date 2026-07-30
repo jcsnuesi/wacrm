@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  getConversationHref,
   matchesContactFilters,
   normalizeConversation,
 } from "./conversations";
@@ -36,6 +37,20 @@ const tag = (id: string, name = id) => ({
   name,
   color: "#fff",
   created_at: "",
+});
+
+describe("getConversationHref", () => {
+  it("builds the Inbox deep-link for the selected conversation", () => {
+    expect(getConversationHref("conversation-123")).toBe(
+      "/inbox?c=conversation-123",
+    );
+  });
+
+  it("encodes the conversation id as a query parameter", () => {
+    expect(getConversationHref("conversation/123?source=pipeline")).toBe(
+      "/inbox?c=conversation%2F123%3Fsource%3Dpipeline",
+    );
+  });
 });
 
 describe("matchesContactFilters", () => {

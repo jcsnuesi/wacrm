@@ -96,7 +96,7 @@ export async function classifyPipelineIntent(args: {
               evidenceMessageIds: {
                 type: 'array',
                 items: { type: 'string', enum: messageIds },
-                uniqueItems: true,
+                // uniqueItems: true,
                 maxItems: 5,
               },
             },
