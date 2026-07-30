@@ -100,10 +100,9 @@ export function PipelineBoard({
       {/* snap-x + snap-mandatory on mobile so swipes land the next
           stage cleanly at the viewport edge instead of mid-column.
           Disabled on lg+ where snapping would interfere with the
-          natural layout. The board owns both scroll axes so a tall
-          column never pushes the horizontal scrollbar below the visible
-          viewport. */}
-      <div className="pipeline-scroll flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-auto overscroll-contain pb-4 lg:snap-none">
+          natural layout. The board owns horizontal scrolling while each
+          stage keeps its cards inside an independent vertical scroll area. */}
+      <div className="pipeline-scroll flex min-h-0 flex-1 snap-x snap-mandatory gap-3 overflow-x-auto overflow-y-hidden overscroll-contain pb-4 lg:snap-none">
         {sortedStages.map((stage) => {
           const stageDeals = dealsByStage.get(stage.id) ?? [];
           const totalValue = stageDeals.reduce(
@@ -144,15 +143,21 @@ export function PipelineBoard({
         ) : null}
       </DragOverlay>
 
-      <style jsx>{`
+      <style jsx global>{`
         .pipeline-scroll {
           scroll-behavior: smooth;
+        }
+        .pipeline-stage-scroll {
           scrollbar-gutter: stable;
         }
         /* Keep both axes discoverable on desktop. On touch platforms the
            browser may render overlay scrollbars while swipe remains enabled. */
         @media (hover: hover) and (pointer: fine) {
           .pipeline-scroll {
+            scrollbar-width: thin;
+            scrollbar-color: var(--border) transparent;
+          }
+          .pipeline-stage-scroll {
             scrollbar-width: thin;
             scrollbar-color: var(--border) transparent;
           }
@@ -168,6 +173,19 @@ export function PipelineBoard({
             border-radius: 9999px;
           }
           .pipeline-scroll::-webkit-scrollbar-thumb:hover {
+            background-color: var(--muted-foreground);
+          }
+          .pipeline-stage-scroll::-webkit-scrollbar {
+            width: 6px;
+          }
+          .pipeline-stage-scroll::-webkit-scrollbar-track {
+            background: transparent;
+          }
+          .pipeline-stage-scroll::-webkit-scrollbar-thumb {
+            background-color: var(--border);
+            border-radius: 9999px;
+          }
+          .pipeline-stage-scroll::-webkit-scrollbar-thumb:hover {
             background-color: var(--muted-foreground);
           }
         }
@@ -201,7 +219,7 @@ function StageColumn({
     // restore the flex-1 share-the-row behavior. The droppable ref is
     // on the inner messages region below — intentionally NOT here, so
     // a drag over the column header doesn't highlight the whole column.
-    <div className="flex w-[85vw] min-w-[260px] max-w-[320px] shrink-0 snap-start flex-col rounded-xl border border-border bg-card/60 p-4 lg:w-auto lg:max-w-none lg:flex-1 lg:basis-[260px] lg:shrink lg:snap-none">
+    <div className="flex h-full min-h-0 w-[85vw] min-w-[260px] max-w-[320px] shrink-0 snap-start flex-col overflow-hidden rounded-xl border border-border bg-card/60 p-4 lg:w-auto lg:max-w-none lg:flex-1 lg:basis-[260px] lg:shrink lg:snap-none">
       {/* 3px colored top border — sits above the column's padding */}
       <div
         className="-mx-4 -mt-4 h-[3px] rounded-t-xl"
@@ -221,7 +239,7 @@ function StageColumn({
 
       <div
         ref={setNodeRef}
-        className={`mt-3 flex flex-1 flex-col gap-2 rounded-lg transition-all ${
+        className={`pipeline-stage-scroll mt-3 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain rounded-lg pr-1 transition-all ${
           isOver
             ? "bg-primary/5 outline outline-2 outline-dashed outline-primary outline-offset-2"
             : ""
