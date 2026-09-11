@@ -2,6 +2,7 @@ import { after } from 'next/server';
 
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
+import { syncWhatsAppContactIdentities } from '@/lib/contacts/identities';
 import { supabaseAdmin } from '@/lib/flows/admin-client';
 import { dispatchWebhookEvent } from '@/lib/webhooks/deliver';
 import {
@@ -85,6 +86,28 @@ async function processInbound(params: Record<string, string>): Promise<void> {
     }
   }
   if (!contact) return;
+
+  try {
+    const writes = await syncWhatsAppContactIdentities(db, {
+      accountId: config.account_id,
+      contactId: contact.id,
+      phone: contact.phone ?? customerPhone,
+      displayName: contact.name ?? params.ProfileName ?? customerPhone,
+      avatarUrl:
+        typeof contact.avatar_url === 'string' ? contact.avatar_url : null,
+      provider: 'twilio',
+    });
+    for (const write of writes) {
+      if (write.status === 'conflict') {
+        console.warn('[twilio-inbound] identity belongs to another contact', {
+          contactId: contact.id,
+          conflictingContactId: write.contactId,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[twilio-inbound] contact identity projection failed:', error);
+  }
 
   const conversationResult = await findOrCreateConversation(
     config.account_id,

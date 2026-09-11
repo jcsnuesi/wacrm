@@ -1,4 +1,5 @@
 import type { AccountRole } from '@/lib/auth/roles';
+import type { Channel } from '@/lib/channels/types';
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive';
 
 export type {
@@ -118,6 +119,21 @@ export interface Contact {
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
    *  Inbox conversation list, for tag filtering). Absent otherwise. */
   tags?: Tag[];
+}
+
+export interface ContactIdentity {
+  id: string;
+  account_id: string;
+  contact_id: string;
+  channel: Channel;
+  external_id: string;
+  username?: string | null;
+  display_name?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Tag {

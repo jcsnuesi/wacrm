@@ -4,6 +4,7 @@ import { decrypt, encrypt, isLegacyFormat } from '@/lib/whatsapp/encryption';
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api';
 import { normalizePhone } from '@/lib/whatsapp/phone-utils';
 import { findExistingContact, isUniqueViolation } from '@/lib/contacts/dedupe';
+import { syncWhatsAppContactIdentities } from '@/lib/contacts/identities';
 import { resolveWhatsAppRecipient } from '@/lib/whatsapp/recipient';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
 import { runAutomationsForTrigger } from '@/lib/automations/engine';
@@ -636,6 +637,32 @@ async function processMessage(
   );
   if (!contactOutcome) return;
   const contactRecord = contactOutcome.contact;
+
+  // Keep the new generic identity projection current without changing the
+  // legacy WhatsApp lookup path. A projection failure must never drop an
+  // inbound message; migration 043 backfills it on the next safe run.
+  try {
+    const writes = await syncWhatsAppContactIdentities(supabaseAdmin(), {
+      accountId,
+      contactId: contactRecord.id,
+      phone: contactRecord.phone ?? senderPhone,
+      whatsappUserId: contactRecord.whatsapp_user_id ?? whatsappUserId,
+      username: contactRecord.whatsapp_username ?? username,
+      displayName: contactRecord.name ?? contactName,
+      avatarUrl: contactRecord.avatar_url,
+      provider: 'meta',
+    });
+    for (const write of writes) {
+      if (write.status === 'conflict') {
+        console.warn('[webhook] WhatsApp identity belongs to another contact', {
+          contactId: contactRecord.id,
+          conflictingContactId: write.contactId,
+        });
+      }
+    }
+  } catch (error) {
+    console.error('[webhook] contact identity projection failed:', error);
+  }
 
   // Find or create conversation
   const convResult = await findOrCreateConversation(
