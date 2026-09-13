@@ -16,6 +16,9 @@ import {
 import type { Channel, ChannelAccount } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 
 const CHANNEL_META: Record<
@@ -60,6 +63,9 @@ export function ChannelsPanel({
   const [accounts, setAccounts] = useState<ChannelAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [setupChannel, setSetupChannel] = useState<'instagram' | 'facebook' | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({ externalAccountId: '', displayName: '', username: '', accessToken: '' });
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -81,6 +87,27 @@ export function ChannelsPanel({
   useEffect(() => {
     void load();
   }, [load]);
+
+  async function saveSocialChannel() {
+    if (!setupChannel) return;
+    setSaving(true);
+    setError(null);
+    try {
+      const response = await fetch('/api/channels', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: setupChannel, ...form }),
+      });
+      const body = (await response.json().catch(() => null)) as { error?: string } | null;
+      if (!response.ok) throw new Error(body?.error ?? 'Unable to save channel');
+      setSetupChannel(null);
+      setForm({ externalAccountId: '', displayName: '', username: '', accessToken: '' });
+      await load();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Unable to save channel');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <section className="animate-in fade-in-50 duration-200">
@@ -148,8 +175,12 @@ export function ChannelsPanel({
                     <Button variant="outline" size="sm" onClick={onOpenWhatsApp}>
                       Manage
                     </Button>
+                  ) : channel === 'tiktok' ? (
+                    <span className="text-muted-foreground text-xs">Awaiting API access</span>
                   ) : (
-                    <span className="text-muted-foreground text-xs">Setup coming next</span>
+                    <Button variant="outline" size="sm" onClick={() => setSetupChannel(channel)}>
+                      {primary ? 'Update' : 'Connect'}
+                    </Button>
                   )}
                 </CardContent>
               </Card>
@@ -157,6 +188,24 @@ export function ChannelsPanel({
           })}
         </div>
       )}
+      <Dialog open={setupChannel !== null} onOpenChange={(open) => !open && setSetupChannel(null)}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Connect {setupChannel === 'instagram' ? 'Instagram' : 'Facebook Messenger'}</DialogTitle>
+            <DialogDescription>
+              The access token is encrypted on the server. Use the connected professional account or Page ID that Meta sends as the webhook receiver.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5"><Label htmlFor="social-account-id">Meta account or Page ID</Label><Input id="social-account-id" value={form.externalAccountId} onChange={(event) => setForm({ ...form, externalAccountId: event.target.value })} autoComplete="off" /></div>
+            <div className="space-y-1.5"><Label htmlFor="social-display-name">Display name</Label><Input id="social-display-name" value={form.displayName} onChange={(event) => setForm({ ...form, displayName: event.target.value })} /></div>
+            <div className="space-y-1.5"><Label htmlFor="social-username">Username (optional)</Label><Input id="social-username" value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} placeholder="without @" /></div>
+            <div className="space-y-1.5"><Label htmlFor="social-access-token">Meta access token</Label><Input id="social-access-token" type="password" value={form.accessToken} onChange={(event) => setForm({ ...form, accessToken: event.target.value })} autoComplete="new-password" /></div>
+            <p className="text-muted-foreground rounded-lg bg-muted p-3 text-xs leading-5">Webhook callback: <code>{typeof window === 'undefined' ? '/api/{channel}/webhook' : `${window.location.origin}/api/${setupChannel}/webhook`}</code>. Configure its matching verify token and <code>META_APP_SECRET</code> in the deployment environment.</p>
+            <Button className="w-full" disabled={saving || !form.externalAccountId.trim() || !form.accessToken.trim()} onClick={() => void saveSocialChannel()}>{saving ? <Loader2 className="size-4 animate-spin" /> : null}Save connection</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

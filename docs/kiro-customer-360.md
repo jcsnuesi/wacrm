@@ -157,6 +157,7 @@ Changes:
 3. Canonical social events create or update `customers`, `contact_identities`, `conversations`, and `messages` without creating legacy contacts.
 4. Migration 049 removes only the legacy non-null requirements that prevented social-only customers and adds per-channel-account idempotency indexes.
 5. Outbound social sending remains deliberately disabled until a connected account has a configured Meta send credential and product permission.
+6. Settings → Channels now lets an administrator connect or update Instagram/Facebook receiver accounts; the Meta token is encrypted server-side and never returned by the API.
 
 ### Stage 11: Customer 360 read surface
 
@@ -225,7 +226,7 @@ Migrations 043 through 048 were applied manually through the Supabase SQL Editor
 ## Current progress
 
 - Current stage: local implementation through Stage 12 is complete where it does not require third-party permissions.
-- Immediate next action: apply migration 049, create connected Instagram/Facebook `channel_accounts`, configure both webhook verify tokens and Meta subscriptions, then execute a signed end-to-end inbound regression.
+- Immediate next action: connect Instagram/Facebook under Settings → Channels, configure both webhook verify tokens and Meta subscriptions, then execute a signed end-to-end inbound regression.
 
 ## Related files
 
