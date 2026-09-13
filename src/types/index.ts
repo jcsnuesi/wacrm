@@ -1,5 +1,6 @@
 import type { AccountRole } from '@/lib/auth/roles';
 import type { Channel } from '@/lib/channels/types';
+export type { Channel } from '@/lib/channels/types';
 import type { InteractiveMessagePayload } from '@/lib/whatsapp/interactive';
 
 export type {
@@ -131,6 +132,20 @@ export interface ContactIdentity {
   display_name?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChannelAccount {
+  id: string;
+  channel: Channel;
+  provider: string;
+  external_account_id: string;
+  display_name?: string | null;
+  username?: string | null;
+  status: 'connected' | 'disconnected' | 'expired' | 'error' | 'pending';
+  token_expires_at?: string | null;
   metadata: Record<string, unknown>;
   created_at: string;
   updated_at: string;

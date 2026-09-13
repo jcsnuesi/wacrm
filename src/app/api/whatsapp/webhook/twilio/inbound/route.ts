@@ -87,6 +87,7 @@ async function processInbound(params: Record<string, string>): Promise<void> {
   }
   if (!contact) return;
 
+  let customerIdentityId: string | null = null;
   try {
     const writes = await syncWhatsAppContactIdentities(db, {
       accountId: config.account_id,
@@ -105,15 +106,21 @@ async function processInbound(params: Record<string, string>): Promise<void> {
         });
       }
     }
+    customerIdentityId =
+      writes.find((write) => write.status !== 'conflict')?.id ?? null;
   } catch (error) {
-    console.error('[twilio-inbound] contact identity projection failed:', error);
+    console.error(
+      '[twilio-inbound] contact identity projection failed:',
+      error
+    );
   }
 
   const conversationResult = await findOrCreateConversation(
     config.account_id,
     config.user_id,
     contact.id,
-    config.id
+    config.id,
+    customerIdentityId
   );
   if (!conversationResult) return;
 
@@ -250,7 +257,8 @@ async function findOrCreateConversation(
   accountId: string,
   userId: string,
   contactId: string,
-  configId: string
+  configId: string,
+  customerIdentityId: string | null
 ): Promise<{ id: string; created: boolean; unreadCount: number } | null> {
   const db = supabaseAdmin();
   const { data: existing } = await db
@@ -261,6 +269,12 @@ async function findOrCreateConversation(
     .eq('whatsapp_config_id', configId)
     .maybeSingle();
   if (existing) {
+    if (customerIdentityId) {
+      await db
+        .from('conversations')
+        .update({ customer_identity_id: customerIdentityId })
+        .eq('id', existing.id);
+    }
     return {
       id: existing.id,
       created: false,
@@ -275,6 +289,7 @@ async function findOrCreateConversation(
       user_id: userId,
       contact_id: contactId,
       whatsapp_config_id: configId,
+      customer_identity_id: customerIdentityId,
     })
     .select('id, unread_count')
     .single();

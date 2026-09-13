@@ -600,12 +600,14 @@ async function handleReaction(
 
 async function processMessage(
   message: WhatsAppMessage,
-  contact: {
-    profile?: { name?: string };
-    wa_id?: string;
-    user_id?: string;
-    username?: string;
-  } | undefined,
+  contact:
+    | {
+        profile?: { name?: string };
+        wa_id?: string;
+        user_id?: string;
+        username?: string;
+      }
+    | undefined,
   // Tenancy. Resolved from the matched whatsapp_config row; every
   // contact / conversation / message row created downstream is
   // stamped with this so any member of the account can see it.
@@ -623,9 +625,8 @@ async function processMessage(
   const waId = cleanWhatsAppIdentifier(contact?.wa_id ?? message.from);
   // Meta's `from` can be empty for username users. Only treat a value as a
   // phone when it actually looks like one; never turn a BSUID into digits.
-  const senderPhone = waId && /^[+\d\s().-]+$/.test(waId)
-    ? normalizePhone(waId)
-    : null;
+  const senderPhone =
+    waId && /^[+\d\s().-]+$/.test(waId) ? normalizePhone(waId) : null;
   const contactName = contact?.profile?.name?.trim() || '';
   const username = cleanWhatsAppIdentifier(contact?.username);
 
@@ -641,6 +642,7 @@ async function processMessage(
   // Keep the new generic identity projection current without changing the
   // legacy WhatsApp lookup path. A projection failure must never drop an
   // inbound message; migration 043 backfills it on the next safe run.
+  let customerIdentityId: string | null = null;
   try {
     const writes = await syncWhatsAppContactIdentities(supabaseAdmin(), {
       accountId,
@@ -660,6 +662,8 @@ async function processMessage(
         });
       }
     }
+    customerIdentityId =
+      writes.find((write) => write.status !== 'conflict')?.id ?? null;
   } catch (error) {
     console.error('[webhook] contact identity projection failed:', error);
   }
@@ -670,7 +674,8 @@ async function processMessage(
     configOwnerUserId,
     contactRecord.id,
     whatsappConfigId,
-    resolveWhatsAppRecipient(contactRecord)
+    resolveWhatsAppRecipient(contactRecord),
+    customerIdentityId
   );
   if (!convResult) return;
   const conversation = convResult.conversation;
@@ -1125,7 +1130,8 @@ async function findOrCreateContact(
       .maybeSingle();
     if (error) console.error('[webhook] BSUID contact lookup failed:', error);
     existingContact = data ?? null;
-    if (existingContact) console.info('[webhook] WhatsApp contact resolved using BSUID');
+    if (existingContact)
+      console.info('[webhook] WhatsApp contact resolved using BSUID');
   }
 
   // Find an existing contact for this account by phone. The shared
@@ -1135,8 +1141,13 @@ async function findOrCreateContact(
   // helper backs the manual contact form and CSV import, so all three
   // paths agree on what "same number" means (issue #212).
   if (!existingContact && phone) {
-    existingContact = await findExistingContact(supabaseAdmin(), accountId, phone);
-    if (existingContact) console.info('[webhook] WhatsApp contact resolved using phone fallback');
+    existingContact = await findExistingContact(
+      supabaseAdmin(),
+      accountId,
+      phone
+    );
+    if (existingContact)
+      console.info('[webhook] WhatsApp contact resolved using phone fallback');
   }
 
   if (existingContact) {
@@ -1155,7 +1166,8 @@ async function findOrCreateContact(
         .from('contacts')
         .update({ ...changes, updated_at: new Date().toISOString() })
         .eq('id', existingContact.id);
-      if (error) console.error('[webhook] contact identity enrichment failed:', error);
+      if (error)
+        console.error('[webhook] contact identity enrichment failed:', error);
       else Object.assign(existingContact, changes);
     }
     return { contact: existingContact, wasCreated: false };
@@ -1209,7 +1221,8 @@ async function findOrCreateConversation(
   configOwnerUserId: string,
   contactId: string,
   whatsappConfigId: string,
-  recipient: ReturnType<typeof resolveWhatsAppRecipient>
+  recipient: ReturnType<typeof resolveWhatsAppRecipient>,
+  customerIdentityId: string | null
 ) {
   // Look for an existing conversation in this account, oldest-first.
   //
@@ -1245,6 +1258,9 @@ async function findOrCreateConversation(
         .update({
           whatsapp_recipient_id: recipient.value,
           whatsapp_recipient_type: recipient.type,
+          ...(customerIdentityId
+            ? { customer_identity_id: customerIdentityId }
+            : {}),
         })
         .eq('id', existingRows[0].id);
     }
@@ -1262,6 +1278,7 @@ async function findOrCreateConversation(
       whatsapp_config_id: whatsappConfigId,
       whatsapp_recipient_id: recipient?.value ?? null,
       whatsapp_recipient_type: recipient?.type ?? null,
+      customer_identity_id: customerIdentityId,
     })
     .select()
     .single();
