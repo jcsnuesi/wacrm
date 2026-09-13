@@ -13,10 +13,10 @@ This document is the versioned Kiro board for the WACRM omnichannel stream.
 - [~] Stage 6: Identity resolution service and IdentityMatch review queue (schema and candidate rules implemented)
 - [~] Stage 7: Customer merge with immutable audit history (RPC and history migration implemented)
 - [~] Stage 8: Provider adapter contract and WhatsApp adapter (normalizer implemented; routing cutover pending)
-- [ ] Stage 9: Instagram provider, webhook, and messaging pipeline
-- [ ] Stage 10: Facebook provider pipeline
-- [ ] Stage 11: Customer 360 API and minimal UI
-- [ ] Stage 12: TikTok capability adapter and rollout hardening
+- [~] Stage 9: Instagram provider and inbound webhook pipeline (external activation pending)
+- [~] Stage 10: Facebook provider and inbound webhook pipeline (external activation pending)
+- [~] Stage 11: Customer 360 read API and minimal UI (profile detail/edit pending)
+- [~] Stage 12: TikTok capability boundary and rollout hardening (product access pending)
 
 ## Current architecture
 
@@ -146,6 +146,33 @@ Status: [~] Meta app identified; [ ] product, credentials, and webhook pending
 - Required before activation: add Instagram Messaging, connect a professional Instagram account, create the `channel_accounts` record with encrypted token, and subscribe a verified HTTPS callback.
 - Testing is restricted to app-role users until the app has the required access and is live.
 
+### Stage 9 and 10: Meta social inbound pipeline
+
+Status: [x] Implemented locally; [ ] external activation pending
+
+Changes:
+
+1. Instagram and Facebook providers normalize the common Meta Messenger webhook envelope and ignore outbound echoes.
+2. Both webhook routes verify the raw HMAC payload, resolve a connected `channel_accounts` receiver, and acknowledge before asynchronous persistence.
+3. Canonical social events create or update `customers`, `contact_identities`, `conversations`, and `messages` without creating legacy contacts.
+4. Migration 049 removes only the legacy non-null requirements that prevented social-only customers and adds per-channel-account idempotency indexes.
+5. Outbound social sending remains deliberately disabled until a connected account has a configured Meta send credential and product permission.
+
+### Stage 11: Customer 360 read surface
+
+Status: [x] Minimal read API and dashboard surface implemented
+
+- `GET /api/customers` lists the tenant-scoped canonical profiles with identities and conversation counts.
+- `GET /api/customers/:id` returns a canonical profile and its channel activity.
+- `POST /api/customers/:id/merge` activates the existing transactional merge RPC for agents.
+- `/customers` presents a searchable, channel-oriented overview; legacy Contacts remains unchanged.
+
+### Stage 12: TikTok rollout boundary
+
+Status: [x] Capability boundary implemented; [ ] product/API access pending
+
+`TikTokProvider` explicitly returns no inbound events and rejects outgoing messages. This prevents a connected-looking integration from silently dropping or sending traffic before the approved TikTok product supports messaging.
+
 ## User stories
 
 ### US-001: Single customer
@@ -181,6 +208,9 @@ Status: [ ] Pending
 - [x] Pending identity-match candidate tests passed.
 - [x] Customer-merge invariant tests passed.
 - [x] WhatsApp provider-normalization tests passed.
+- [x] Instagram, Facebook, and TikTok provider tests added.
+- [x] Full project suite after Stage 9–12 local implementation: 85 files / 748 tests passed.
+- [x] TypeScript typecheck and ESLint passed after Stage 9–12 local implementation.
 - [x] Full project suite at time of implementation: 79 files / 737 tests passed.
 - [x] TypeScript typecheck passed.
 - [x] New files pass Prettier and `git diff --check`.
@@ -194,8 +224,8 @@ Migrations 043 through 048 were applied manually through the Supabase SQL Editor
 
 ## Current progress
 
-- Current stage: migrations 045 and 046 are authored and validated statically.
-- Immediate next action: implement the Instagram adapter after its Meta app and webhook configuration are available; migrations remain unapplied until Stage 4 is resumed.
+- Current stage: local implementation through Stage 12 is complete where it does not require third-party permissions.
+- Immediate next action: apply migration 049, create connected Instagram/Facebook `channel_accounts`, configure both webhook verify tokens and Meta subscriptions, then execute a signed end-to-end inbound regression.
 
 ## Related files
 
