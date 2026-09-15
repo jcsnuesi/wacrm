@@ -15,7 +15,7 @@ This document is the versioned Kiro board for the WACRM omnichannel stream.
 - [~] Stage 8: Provider adapter contract and WhatsApp adapter (normalizer implemented; routing cutover pending)
 - [~] Stage 9: Instagram provider and inbound webhook pipeline (external activation pending)
 - [~] Stage 10: Facebook provider and inbound webhook pipeline (external activation pending)
-- [~] Stage 11: Customer 360 read API and minimal UI (profile detail/edit pending)
+- [~] Stage 11: Customer 360 read API and profile detail (tests, typecheck, lint, and format verified; production build and signed-in browser acceptance pending)
 - [~] Stage 12: TikTok capability boundary and rollout hardening (product access pending)
 
 ## Current architecture
@@ -161,12 +161,16 @@ Changes:
 
 ### Stage 11: Customer 360 read surface
 
-Status: [x] Minimal read API and dashboard surface implemented
+Status: [x] Read API, list navigation, and profile detail implemented; [~] automated verification (production build pending); [ ] signed-in browser acceptance
+
+Completion spec: `../.kiro/specs/customer-360-profile/spec.md`
 
 - `GET /api/customers` lists the tenant-scoped canonical profiles with identities and conversation counts.
 - `GET /api/customers/:id` returns a canonical profile and its channel activity.
 - `POST /api/customers/:id/merge` activates the existing transactional merge RPC for agents.
-- `/customers` presents a searchable, channel-oriented overview; legacy Contacts remains unchanged.
+- `/customers` presents a searchable, channel-oriented overview whose semantic cards open `/customers/:id`; legacy Contacts remains unchanged.
+- `/customers/:id` renders canonical summary data, identity fallbacks and empty state, newest-first channel activity, Inbox deep-links, loading, 404, unauthorized, and recoverable failure states.
+- Automated coverage validates card destinations, detail rendering, empty states, identity fallback labels, Inbox links, API account scoping, and API error behavior.
 
 ### Stage 12: TikTok rollout boundary
 
@@ -211,13 +215,37 @@ Status: [ ] Pending
 - [x] WhatsApp provider-normalization tests passed.
 - [x] Instagram, Facebook, and TikTok provider tests added.
 - [x] Full project suite after Stage 9–12 local implementation: 85 files / 748 tests passed.
+- [x] Stage 11 automated tests: 89 test files / 762 tests passed; TypeScript, ESLint, Prettier, and `git diff --check` passed.
+- [~] Stage 11 final acceptance remains pending: complete the production build in a runner where its workers terminate, then complete the signed-in browser acceptance at desktop and mobile widths. The local runner has no authenticated test session, and both Turbopack/PostCSS and Webpack build workers did not terminate reliably.
 - [x] TypeScript typecheck and ESLint passed after Stage 9–12 local implementation.
 - [x] Full project suite at time of implementation: 79 files / 737 tests passed.
 - [x] TypeScript typecheck passed.
 - [x] New files pass Prettier and `git diff --check`.
 - [x] SQL migrations applied and counted in Supabase: 357 customers, 380 identities, 356 conversations, and 2 channel accounts.
 - [x] Canonical-reference integrity: no null `customer_id` in contacts, identities, or conversations; no null `channel_id` in channel accounts.
-- [ ] WhatsApp regression exercised against a migrated database.
+- [x] Migration 050 production smoke test: a temporary legacy contact created its canonical customer with matching bidirectional references; all temporary rows were removed afterward.
+- [~] End-to-end WhatsApp regression from a previously unknown number is pending after the production migration 050 smoke test.
+
+## WhatsApp inbound production incident
+
+Production logs showed PostgreSQL error `23503` on
+`customers_legacy_contact_id_fkey` while the webhook created previously unknown
+contacts. Migration 045 installed `ensure_customer_for_legacy_contact` as a
+`BEFORE INSERT` trigger, but the reverse foreign key from
+`customers.legacy_contact_id` to `contacts.id` was immediate. PostgreSQL
+therefore rejected the canonical customer before the new contact row became
+visible, rolled back contact creation, and prevented the inbound message from
+being stored. Existing contacts were unaffected, which made message delivery
+appear intermittent.
+
+Migration `050_defer_customer_legacy_contact_fk.sql` makes that foreign key
+`DEFERRABLE INITIALLY DEFERRED`, so it is checked at transaction commit after
+both rows exist. Migration 050 was applied in production and a database smoke
+test successfully created a temporary contact and its canonical customer with
+matching `contacts.customer_id` and `customers.legacy_contact_id` references.
+The temporary records were removed successfully. Exercise an inbound message
+from a number that has never contacted the CRM before marking the end-to-end
+WhatsApp regression complete.
 
 ## Stage 4 execution note
 
@@ -225,15 +253,17 @@ Migrations 043 through 048 were applied manually through the Supabase SQL Editor
 
 ## Current progress
 
-- Current stage: local implementation through Stage 12 is complete where it does not require third-party permissions.
-- Immediate next action: connect Instagram/Facebook under Settings → Channels, configure both webhook verify tokens and Meta subscriptions, then execute a signed end-to-end inbound regression.
+- Current stage: local implementation through Stage 12 is complete where it does not require third-party permissions; Stage 11 automated verification is complete.
+- Immediate next action: perform the signed-in Customer 360 browser acceptance at desktop and mobile widths, then exercise a WhatsApp inbound message from a new number. Continue with the Instagram/Facebook channel activation afterward.
 
 ## Related files
 
 - Core migration: `../supabase/migrations/045_customer_360_core.sql`
+- Deferred legacy-contact FK fix: `../supabase/migrations/050_defer_customer_legacy_contact_fk.sql`
 - Conversation bridge: `../supabase/migrations/046_omnichannel_conversation_bridge.sql`
 - Deterministic resolver: `../src/lib/customers/identity-resolution.ts`
 - Resolver tests: `../src/lib/customers/identity-resolution.test.ts`
 - Review candidates: `../src/lib/customers/identity-match-candidates.ts`
 - Merge validation: `../src/lib/customers/customer-merge.ts`
 - Provider contract: `../src/lib/channels/provider.ts`
+- Customer profile completion spec: `../.kiro/specs/customer-360-profile/spec.md`

@@ -64,7 +64,7 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const PRIVATE_PAGE_PATTERN =
-  'agents(?:/|$)|automations(?:/|$)|broadcasts(?:/|$)|contacts(?:/|$)|dashboard(?:/|$)|flows(?:/|$)|inbox(?:/|$)|notifications(?:/|$)|pipelines(?:/|$)|settings(?:/|$)';
+  'agents(?:/|$)|automations(?:/|$)|broadcasts(?:/|$)|contacts(?:/|$)|customers(?:/|$)|dashboard(?:/|$)|flows(?:/|$)|inbox(?:/|$)|notifications(?:/|$)|pipelines(?:/|$)|settings(?:/|$)';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
