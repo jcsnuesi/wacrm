@@ -29,6 +29,14 @@ function isPublicWhatsappWebhookPath(pathname: string) {
 }
 
 export async function proxy(request: NextRequest) {
+  // Meta and Twilio must be able to deliver webhooks even if Supabase Auth
+  // is slow or unavailable. Their route handlers verify provider-specific
+  // HMAC signatures before accepting a payload, so skip browser-session
+  // resolution entirely for this narrow public surface.
+  if (isPublicWhatsappWebhookPath(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -109,11 +117,10 @@ export async function proxy(request: NextRequest) {
     return withRefreshedCookies(NextResponse.redirect(url));
   }
 
-  // API routes that need auth (not webhooks)
+  // API routes that need auth (webhooks returned above)
   if (
     !user &&
-    request.nextUrl.pathname.startsWith('/api/whatsapp/') &&
-    !isPublicWhatsappWebhookPath(request.nextUrl.pathname)
+    request.nextUrl.pathname.startsWith('/api/whatsapp/')
   ) {
     return withRefreshedCookies(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

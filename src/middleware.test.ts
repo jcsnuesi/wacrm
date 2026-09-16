@@ -14,6 +14,7 @@ let refreshedCookies: Array<{
   value: string;
   options: Record<string, unknown>;
 }> = [];
+let getUserCalls = 0;
 
 vi.mock('@supabase/ssr', () => ({
   createServerClient: (
@@ -28,6 +29,7 @@ vi.mock('@supabase/ssr', () => ({
       // refreshed inside getUser(), which rotates the refresh token and
       // pushes the new cookies through setAll() before resolving.
       getUser: async () => {
+        getUserCalls += 1;
         if (refreshedCookies.length) opts.cookies.setAll(refreshedCookies);
         return { data: { user: mockUser } };
       },
@@ -43,6 +45,7 @@ beforeEach(() => {
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = 'anon-key';
   mockUser = null;
   refreshedCookies = [];
+  getUserCalls = 0;
 });
 
 afterEach(() => vi.clearAllMocks());
@@ -127,7 +130,7 @@ describe('proxy — refreshed auth cookies survive redirects', () => {
     expect(res.headers.get('location')).toBeNull();
   });
 
-  it('allows the exact WhatsApp webhook path without a browser session', async () => {
+  it('allows the exact WhatsApp webhook path without consulting Supabase Auth', async () => {
     mockUser = null;
 
     const res = await proxy(
@@ -136,6 +139,17 @@ describe('proxy — refreshed auth cookies survive redirects', () => {
 
     expect(res.status).toBe(200);
     expect(res.headers.get('location')).toBeNull();
+    expect(getUserCalls).toBe(0);
+  });
+
+  it.each([
+    '/api/whatsapp/webhook/twilio/inbound',
+    '/api/whatsapp/webhook/twilio/status',
+  ])('bypasses Supabase Auth for signed webhook subpath %s', async (path) => {
+    const res = await proxy(new NextRequest(`https://app.test${path}`));
+
+    expect(res.status).toBe(200);
+    expect(getUserCalls).toBe(0);
   });
 
   it('does not let similarly named WhatsApp webhook paths bypass auth', async () => {
