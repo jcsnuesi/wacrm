@@ -130,7 +130,7 @@ function IdentitySection({
   identities: Customer360Identity[];
 }) {
   return (
-    <section className="border-border bg-card rounded-xl border p-5">
+    <section className="border-border bg-card min-w-0 rounded-xl border p-5">
       <div className="flex items-center gap-2">
         <AtSign aria-hidden="true" className="text-primary size-4" />
         <h2 className="text-foreground font-semibold">Identidades</h2>
@@ -140,7 +140,7 @@ function IdentitySection({
       </p>
 
       {identities.length > 0 ? (
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-4 min-w-0 space-y-2">
           {identities.map((identity) => {
             const channel = identity.channel.toLowerCase();
             return (
@@ -184,7 +184,7 @@ function ConversationSection({
   conversations: Customer360Conversation[];
 }) {
   return (
-    <section className="border-border bg-card rounded-xl border p-5">
+    <section className="border-border bg-card min-w-0 rounded-xl border p-5">
       <div className="flex items-center gap-2">
         <MessageCircle aria-hidden="true" className="text-primary size-4" />
         <h2 className="text-foreground font-semibold">Actividad por canal</h2>
@@ -194,17 +194,17 @@ function ConversationSection({
       </p>
 
       {conversations.length > 0 ? (
-        <ul className="mt-4 space-y-2">
+        <ul className="mt-4 min-w-0 space-y-2">
           {conversations.map((conversation) => {
             const account = conversation.channel_account;
             const channel = account?.channel?.toLowerCase();
             const channelName = channelLabel(channel);
             return (
-              <li key={conversation.id}>
+              <li key={conversation.id} className="min-w-0 max-w-full">
                 <Link
                   href={getConversationHref(conversation.id)}
                   aria-label={`Abrir conversación de ${channelName} en Inbox`}
-                  className="group border-border bg-background/50 hover:border-primary/35 hover:bg-muted/20 focus-visible:ring-ring block min-h-11 rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="group border-border bg-background/50 hover:border-primary/35 hover:bg-muted/20 focus-visible:ring-ring block min-h-11 min-w-0 max-w-full overflow-hidden rounded-lg border p-3 transition-colors focus-visible:ring-2 focus-visible:outline-none"
                 >
                   <div className="flex min-w-0 items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -333,7 +333,7 @@ export function CustomerProfile({ customer }: { customer: Customer360Detail }) {
         </div>
       </header>
 
-      <div className="grid gap-4 lg:grid-cols-[0.8fr_1.2fr]">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
         <IdentitySection identities={identities} />
         <ConversationSection conversations={conversations} />
       </div>

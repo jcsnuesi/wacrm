@@ -73,4 +73,27 @@ describe('CustomerProfile', () => {
     expect(markup).toContain('No hay actividad de canal registrada.');
     expect(markup).toContain('href="/customers"');
   });
+
+  it('keeps a long activity preview constrained to its channel card', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(CustomerProfile, {
+        customer: {
+          id: 'customer-1',
+          status: 'active',
+          created_at: '2026-01-01T12:00:00Z',
+          updated_at: '2026-01-02T12:00:00Z',
+          conversations: [
+            {
+              id: 'conversation-1',
+              status: 'open',
+              last_message_text: 'Mensaje muy largo sin espacios '.repeat(20),
+            },
+          ],
+        },
+      })
+    );
+
+    expect(markup).toContain('minmax(0,0.8fr)_minmax(0,1.2fr)');
+    expect(markup).toContain('min-w-0 max-w-full overflow-hidden');
+  });
 });
