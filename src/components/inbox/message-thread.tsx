@@ -52,6 +52,11 @@ import { AiThreadBanner } from './ai-thread-banner';
 import { AiPipelineRoutingBanner } from './ai-pipeline-routing-banner';
 import { buildReplyPreview } from './reply-quote';
 import { toast } from 'sonner';
+import {
+  ChannelIndicator,
+  getInboxChannel,
+  getInboxChannelLabel,
+} from './channel-indicator';
 
 interface ReplyDraft {
   id: string;
@@ -874,21 +879,30 @@ export function MessageThread({
     );
   }
 
-  const displayName = contact.name || contact.whatsapp_username || 'WhatsApp user';
+  const channel = getInboxChannel(conversation);
+  const channelLabel = getInboxChannelLabel(channel);
+  const displayName =
+    contact.name || contact.whatsapp_username || `${channelLabel} user`;
   // Older username contacts may have the literal legacy sentinel "hidden"
   // rather than a SQL NULL. Neither is a deliverable phone number.
   const phoneIsHidden =
     !contact.phone || contact.phone.trim().toLowerCase() === 'hidden';
   const contactIdentityLabel = phoneIsHidden
     ? contact.whatsapp_user_id
-      ? `BSUID: ${contact.whatsapp_user_id}`
-      : 'Phone hidden'
+      ? channel === 'whatsapp'
+        ? `BSUID: ${contact.whatsapp_user_id}`
+        : `${channelLabel} ID: ${contact.whatsapp_user_id}`
+      : channel === 'whatsapp'
+        ? 'Phone hidden'
+        : `${channelLabel} user`
     : contact.phone;
   const provider = conversation.whatsapp_config?.provider ?? 'meta';
   const lineLabel =
+    conversation.channel_account?.username ||
+    conversation.channel_account?.display_name ||
     conversation.whatsapp_config?.sender_phone ||
     conversation.whatsapp_config?.phone_number_id ||
-    'WhatsApp';
+    channelLabel;
   const messageGroups = groupMessagesByDate(messages);
   const currentStatus = STATUS_OPTIONS.find(
     (s) => s.value === conversation.status
@@ -929,14 +943,17 @@ export function MessageThread({
             {displayName.charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
-            <h2 className="text-foreground truncate text-sm font-semibold">
-              {displayName}
-            </h2>
+            <div className="flex items-center gap-1.5">
+              <ChannelIndicator channel={channel} />
+              <h2 className="text-foreground truncate text-sm font-semibold">
+                {displayName}
+              </h2>
+            </div>
             <p className="text-muted-foreground truncate text-xs">
               {contactIdentityLabel}
             </p>
             <p className="text-muted-foreground truncate text-[10px] uppercase">
-              {provider} · {lineLabel}
+              {channelLabel} · {lineLabel}
             </p>
           </div>
           {/* Session timer badge — hidden on the narrowest phones so

@@ -126,6 +126,8 @@ export interface Contact {
    * still render their customer identity with this read-only projection.
    */
   is_canonical_customer?: boolean;
+  /** Inbox-only source channel for a canonical identity projection. */
+  source_channel?: Channel;
 }
 
 export interface ContactIdentity {
@@ -217,6 +219,15 @@ export interface Conversation {
   whatsapp_config?: Pick<
     WhatsAppConfig,
     'id' | 'provider' | 'phone_number_id' | 'sender_phone' | 'status'
+  > | null;
+  /**
+   * Present for provider-neutral conversations (Instagram/Facebook and
+   * future channels). WhatsApp keeps `whatsapp_config` during the gradual
+   * compatibility migration.
+   */
+  channel_account?: Pick<
+    ChannelAccount,
+    'channel' | 'display_name' | 'username'
   > | null;
   /**
    * AI auto-reply state for this thread (migration 029 + 033):

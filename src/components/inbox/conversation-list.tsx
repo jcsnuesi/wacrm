@@ -21,6 +21,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { ChannelIndicator, getInboxChannel } from './channel-indicator';
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -432,6 +433,7 @@ function ConversationItem({
   const contact = conversation.contact;
   const displayName = contact?.name || contact?.phone || t("unknown");
   const initials = displayName.charAt(0).toUpperCase();
+  const channel = getInboxChannel(conversation);
 
   const handleClick = useCallback(() => {
     onSelect(conversation);
@@ -452,7 +454,7 @@ function ConversationItem({
       )}
     >
       {/* Avatar */}
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
+      <div className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-medium text-foreground">
         {contact?.avatar_url ? (
           <img
             src={contact.avatar_url}
@@ -462,12 +464,16 @@ function ConversationItem({
         ) : (
           initials
         )}
+        <ChannelIndicator
+          channel={channel}
+          className="absolute -bottom-0.5 -right-0.5 rounded-full bg-card p-0.5 shadow-sm"
+        />
       </div>
 
       {/* Content */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <span className="truncate text-sm font-medium text-foreground">
+          <span className="min-w-0 truncate text-sm font-medium text-foreground">
             {displayName}
           </span>
           <span className="shrink-0 text-[10px] text-muted-foreground">{timeAgo}</span>

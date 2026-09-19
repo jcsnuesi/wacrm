@@ -127,7 +127,7 @@ export function ContactSidebar({ contact }: ContactSidebarProps) {
     );
   }
 
-  const displayName = contact.name || contact.whatsapp_username || 'WhatsApp user';
+  const displayName = contact.name || contact.whatsapp_username || 'Customer';
   const initials = displayName.charAt(0).toUpperCase();
 
   return (

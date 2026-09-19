@@ -12,7 +12,7 @@ export function getConversationHref(conversationId: string): string {
  * flattens them onto `contact.tags`.
  */
 export const CONVERSATION_SELECT =
-  '*, contact:contacts(*, contact_tags(tags(*))), customer:customers(id, account_id, display_name, first_name, last_name, email, phone, created_at, updated_at), customer_identity:contact_identities(id, external_id, username, display_name, phone), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
+  '*, contact:contacts(*, contact_tags(tags(*))), customer:customers(id, account_id, display_name, first_name, last_name, email, phone, created_at, updated_at), customer_identity:contact_identities(id, channel, external_id, username, display_name, phone), channel_account:channel_accounts(channel, display_name, username), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
 
 /** Raw shape returned by {@link CONVERSATION_SELECT} before flattening. */
 type RawContact = Contact & { contact_tags?: { tags: Tag | null }[] };
@@ -28,6 +28,7 @@ type RawCustomer = {
   updated_at: string;
 };
 type RawCustomerIdentity = {
+  channel?: Contact['source_channel'];
   external_id: string;
   username?: string | null;
   display_name?: string | null;
@@ -69,6 +70,7 @@ function customerAsInboxContact(
     updated_at: customer.updated_at,
     tags: [],
     is_canonical_customer: true,
+    source_channel: identity?.channel,
   };
 }
 

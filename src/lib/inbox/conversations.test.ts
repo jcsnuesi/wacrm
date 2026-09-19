@@ -180,6 +180,7 @@ describe("normalizeConversation", () => {
         updated_at: "2026-09-19T00:00:00.000Z",
       },
       customer_identity: {
+        channel: "instagram",
         external_id: "17841400613892250",
         username: "jeansantos06",
         display_name: null,
@@ -193,6 +194,7 @@ describe("normalizeConversation", () => {
       whatsapp_username: "jeansantos06",
       whatsapp_user_id: "17841400613892250",
       is_canonical_customer: true,
+      source_channel: "instagram",
     });
   });
 });
