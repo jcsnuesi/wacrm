@@ -65,6 +65,17 @@ export async function persistInboundEvent(
     customerId = customer.id as string;
   }
 
+  // Keep Customer 360 ordered by its actual latest activity. A social
+  // customer may already exist while a fresh inbound message arrives; in
+  // that case no customer row would otherwise be touched and the profile
+  // could remain pages away from the top of the customer list.
+  const { error: touchCustomerError } = await supabase
+    .from('customers')
+    .update({ updated_at: event.occurredAt })
+    .eq('id', customerId)
+    .eq('account_id', account.account_id);
+  if (touchCustomerError) throw touchCustomerError;
+
   let identityId = currentIdentity?.id as string | undefined;
   if (identityId) {
     const { error } = await supabase

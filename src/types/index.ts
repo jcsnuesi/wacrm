@@ -120,6 +120,12 @@ export interface Contact {
   /** Hydrated by queries that embed `contact_tags(tags(*))` (e.g. the
    *  Inbox conversation list, for tag filtering). Absent otherwise. */
   tags?: Tag[];
+  /**
+   * Inbox-only compatibility view of a canonical Customer. Social channels
+   * intentionally do not create a legacy `contacts` row, but the Inbox can
+   * still render their customer identity with this read-only projection.
+   */
+  is_canonical_customer?: boolean;
 }
 
 export interface ContactIdentity {

@@ -12,13 +12,65 @@ export function getConversationHref(conversationId: string): string {
  * flattens them onto `contact.tags`.
  */
 export const CONVERSATION_SELECT =
-  '*, contact:contacts(*, contact_tags(tags(*))), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
+  '*, contact:contacts(*, contact_tags(tags(*))), customer:customers(id, account_id, display_name, first_name, last_name, email, phone, created_at, updated_at), customer_identity:contact_identities(id, external_id, username, display_name, phone), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
 
 /** Raw shape returned by {@link CONVERSATION_SELECT} before flattening. */
 type RawContact = Contact & { contact_tags?: { tags: Tag | null }[] };
-type RawConversation = Omit<Conversation, 'contact'> & {
-  contact?: RawContact | null;
+type RawCustomer = {
+  id: string;
+  account_id: string;
+  display_name?: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  created_at: string;
+  updated_at: string;
 };
+type RawCustomerIdentity = {
+  external_id: string;
+  username?: string | null;
+  display_name?: string | null;
+  phone?: string | null;
+};
+type RawConversation = Omit<Conversation, 'contact' | 'contact_id'> & {
+  // Canonical social conversations do not have a legacy contacts row.
+  contact_id?: string | null;
+  contact?: RawContact | null;
+  customer?: RawCustomer | null;
+  customer_identity?: RawCustomerIdentity | null;
+};
+
+function customerAsInboxContact(
+  customer: RawCustomer,
+  identity: RawCustomerIdentity | null | undefined
+): Contact {
+  const name =
+    customer.display_name?.trim() ||
+    [customer.first_name?.trim(), customer.last_name?.trim()]
+      .filter(Boolean)
+      .join(' ') ||
+    identity?.display_name?.trim() ||
+    identity?.username?.trim();
+
+  return {
+    // This is deliberately the canonical customer id, not a synthetic
+    // contacts.id. Consumers use the flag below to keep legacy contact
+    // mutations out of social-only customer records.
+    id: customer.id,
+    user_id: '',
+    account_id: customer.account_id,
+    phone: customer.phone ?? identity?.phone ?? null,
+    whatsapp_user_id: identity?.external_id ?? null,
+    whatsapp_username: identity?.username ?? null,
+    name: name || undefined,
+    email: customer.email ?? undefined,
+    created_at: customer.created_at,
+    updated_at: customer.updated_at,
+    tags: [],
+    is_canonical_customer: true,
+  };
+}
 
 /**
  * Flatten the embedded `contact_tags(tags(*))` join into `contact.tags`.
@@ -27,7 +79,14 @@ type RawConversation = Omit<Conversation, 'contact'> & {
  */
 export function normalizeConversation(raw: RawConversation): Conversation {
   const rawContact = raw.contact;
-  if (!rawContact) return raw as Conversation;
+  if (!rawContact) {
+    if (!raw.customer) return raw as Conversation;
+    const { customer, customer_identity, ...conversation } = raw;
+    return {
+      ...conversation,
+      contact: customerAsInboxContact(customer, customer_identity),
+    } as Conversation;
+  }
 
   const { contact_tags, ...contact } = rawContact;
   return {
@@ -38,7 +97,7 @@ export function normalizeConversation(raw: RawConversation): Conversation {
         .map((ct) => ct.tags)
         .filter((t): t is Tag => t != null),
     },
-  };
+  } as Conversation;
 }
 
 export function normalizeConversations(

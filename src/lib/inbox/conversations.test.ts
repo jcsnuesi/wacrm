@@ -157,4 +157,42 @@ describe("normalizeConversation", () => {
     // A contactless row passes through untouched (consumers use `?.`).
     expect(normalizeConversation(raw).contact).toBeNull();
   });
+
+  it("projects a canonical social customer as an Inbox contact", () => {
+    const normalized = normalizeConversation({
+      id: "c-social",
+      user_id: "u1",
+      contact_id: null,
+      status: "open" as const,
+      unread_count: 1,
+      created_at: "2026-09-19T00:00:00.000Z",
+      updated_at: "2026-09-19T00:00:00.000Z",
+      contact: null,
+      customer: {
+        id: "customer-1",
+        account_id: "a1",
+        display_name: null,
+        first_name: null,
+        last_name: null,
+        email: null,
+        phone: null,
+        created_at: "2026-09-19T00:00:00.000Z",
+        updated_at: "2026-09-19T00:00:00.000Z",
+      },
+      customer_identity: {
+        external_id: "17841400613892250",
+        username: "jeansantos06",
+        display_name: null,
+        phone: null,
+      },
+    });
+
+    expect(normalized.contact).toMatchObject({
+      id: "customer-1",
+      name: "jeansantos06",
+      whatsapp_username: "jeansantos06",
+      whatsapp_user_id: "17841400613892250",
+      is_canonical_customer: true,
+    });
+  });
 });
