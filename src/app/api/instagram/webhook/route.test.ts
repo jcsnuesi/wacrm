@@ -8,7 +8,10 @@ vi.mock('@/lib/whatsapp/webhook-signature', () => ({
   verifyMetaWebhookSignature,
 }));
 
-afterEach(() => vi.clearAllMocks());
+afterEach(() => {
+  vi.clearAllMocks();
+  delete process.env.INSTAGRAM_APP_SECRET;
+});
 
 describe('/api/instagram/webhook', () => {
   it('persists a valid event before acknowledging Meta', async () => {
@@ -48,5 +51,24 @@ describe('/api/instagram/webhook', () => {
     );
 
     expect(response.status).toBe(500);
+  });
+
+  it('accepts the primary Meta secret when the Instagram secret does not match', async () => {
+    process.env.INSTAGRAM_APP_SECRET = 'instagram-secret';
+    verifyMetaWebhookSignature
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    processMetaWebhook.mockResolvedValue(undefined);
+    const { POST } = await import('./route');
+
+    const response = await POST(
+      new Request('http://localhost/api/instagram/webhook', {
+        method: 'POST',
+        headers: { 'x-hub-signature-256': 'sha256=valid' },
+        body: JSON.stringify({ entry: [] }),
+      })
+    );
+
+    expect(response.status).toBe(200);
   });
 });

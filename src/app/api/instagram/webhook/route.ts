@@ -33,13 +33,20 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
+  const signature = request.headers.get('x-hub-signature-256');
+  const instagramSecret = process.env.INSTAGRAM_APP_SECRET;
+  const metaSecret = process.env.META_APP_SECRET;
+  const verifiedWithInstagramSecret = instagramSecret
+    ? verifyMetaWebhookSignature(rawBody, signature, instagramSecret)
+    : false;
   if (
-    !verifyMetaWebhookSignature(
-      rawBody,
-      request.headers.get('x-hub-signature-256')
-    )
+    !verifiedWithInstagramSecret &&
+    !verifyMetaWebhookSignature(rawBody, signature, metaSecret)
   ) {
-    console.warn('[instagram webhook] rejected invalid signature');
+    console.warn('[instagram webhook] rejected invalid signature', {
+      instagramSecretConfigured: Boolean(instagramSecret),
+      metaSecretConfigured: Boolean(metaSecret),
+    });
     return new Response('Invalid signature', { status: 403 });
   }
 
