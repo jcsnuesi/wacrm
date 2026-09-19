@@ -1,5 +1,3 @@
-import { after } from 'next/server';
-
 import { InstagramProvider } from '@/lib/channels/instagram/provider';
 import { processMetaWebhook } from '@/lib/channels/meta-webhook';
 import { verifyMetaWebhookSignature } from '@/lib/whatsapp/webhook-signature';
@@ -41,6 +39,7 @@ export async function POST(request: Request) {
       request.headers.get('x-hub-signature-256')
     )
   ) {
+    console.warn('[instagram webhook] rejected invalid signature');
     return new Response('Invalid signature', { status: 403 });
   }
 
@@ -51,14 +50,20 @@ export async function POST(request: Request) {
     return new Response('Invalid JSON', { status: 400 });
   }
 
-  // Acknowledge Meta before database work. `after` keeps the work alive on
-  // serverless runtimes and avoids retry-driven duplicate deliveries.
-  after(async () => {
-    try {
-      await processMetaWebhook('instagram', provider, payload);
-    } catch (error) {
-      console.error('[instagram webhook] inbound persistence failed:', error);
-    }
-  });
-  return Response.json({ status: 'received' });
+  const entryCount = Array.isArray((payload as { entry?: unknown[] }).entry)
+    ? (payload as { entry: unknown[] }).entry.length
+    : 0;
+  console.info('[instagram webhook] received', { entryCount });
+
+  try {
+    // Do not acknowledge until the event is persisted. If storage is
+    // unavailable, Meta receives a 500 and retries instead of silently losing
+    // the message. Inbound persistence is idempotent by external message ID.
+    await processMetaWebhook('instagram', provider, payload);
+    console.info('[instagram webhook] processed', { entryCount });
+    return Response.json({ status: 'received' });
+  } catch (error) {
+    console.error('[instagram webhook] inbound persistence failed:', error);
+    return new Response('Unable to process webhook', { status: 500 });
+  }
 }
