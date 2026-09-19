@@ -42,6 +42,7 @@ export interface Customer360Detail extends Customer360Summary {
 
 export interface Customer360ListResponse {
   customers: Customer360Summary[];
+  total: number;
 }
 
 export interface Customer360DetailResponse {

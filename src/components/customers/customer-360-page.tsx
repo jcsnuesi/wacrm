@@ -31,6 +31,7 @@ const CHANNEL_TONE: Record<string, string> = {
 };
 
 const INBOUND_REFRESH_DEBOUNCE_MS = 300;
+const CUSTOMER_PAGE_SIZE = 100;
 
 export function CustomerCard({ customer }: { customer: Customer360Summary }) {
   const displayName = getCustomerDisplayName(customer);
@@ -126,18 +127,46 @@ export function Customer360Page() {
   const [customers, setCustomers] = useState<Customer360Summary[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [total, setTotal] = useState(0);
   const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const refreshCustomers = useCallback(async () => {
-    try {
-      const response = await fetch('/api/customers', { cache: 'no-store' });
-      if (!response.ok) throw new Error('Failed to load customers');
-      const payload = (await response.json()) as Customer360ListResponse;
-      setCustomers(payload.customers ?? []);
-    } catch {
-      // Keep the last successful list visible while a transient refresh fails.
-    }
-  }, []);
+  const refreshCustomers = useCallback(
+    async (offset = 0, append = false, merge = false) => {
+      try {
+        const response = await fetch(
+          `/api/customers?limit=${CUSTOMER_PAGE_SIZE}&offset=${offset}`,
+          { cache: 'no-store' }
+        );
+        if (!response.ok) throw new Error('Failed to load customers');
+        const payload = (await response.json()) as Customer360ListResponse;
+        const nextCustomers = payload.customers ?? [];
+        setTotal(payload.total ?? nextCustomers.length);
+        setCustomers((previous) => {
+          if (append) {
+            const knownIds = new Set(previous.map((customer) => customer.id));
+            return [
+              ...previous,
+              ...nextCustomers.filter((customer) => !knownIds.has(customer.id)),
+            ];
+          }
+          if (merge) {
+            const freshIds = new Set(
+              nextCustomers.map((customer) => customer.id)
+            );
+            return [
+              ...nextCustomers,
+              ...previous.filter((customer) => !freshIds.has(customer.id)),
+            ];
+          }
+          return nextCustomers;
+        });
+      } catch {
+        // Keep the last successful list visible while a transient refresh fails.
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     void refreshCustomers().finally(() => setLoading(false));
@@ -147,9 +176,17 @@ export function Customer360Page() {
     if (refreshTimerRef.current) return;
     refreshTimerRef.current = setTimeout(() => {
       refreshTimerRef.current = null;
-      void refreshCustomers();
+      // Preserve pages the user has already loaded while placing new inbound
+      // customers at the front of the list.
+      void refreshCustomers(0, false, true);
     }, INBOUND_REFRESH_DEBOUNCE_MS);
   }, [refreshCustomers]);
+
+  const loadMore = useCallback(async () => {
+    setLoadingMore(true);
+    await refreshCustomers(customers.length, true);
+    setLoadingMore(false);
+  }, [customers.length, refreshCustomers]);
 
   // A new inbound creates/updates a conversation and a message. Listening to
   // both covers every provider path while the debounce turns that burst into
@@ -200,9 +237,7 @@ export function Customer360Page() {
           <div className="border-border bg-background/60 flex min-w-32 items-center gap-3 rounded-xl border px-4 py-3">
             <UsersRound aria-hidden="true" className="text-primary size-5" />
             <div>
-              <p className="text-foreground text-xl font-semibold">
-                {customers.length}
-              </p>
+              <p className="text-foreground text-xl font-semibold">{total}</p>
               <p className="text-muted-foreground text-xs">clientes</p>
             </div>
           </div>
@@ -261,6 +296,20 @@ export function Customer360Page() {
           </div>
         )}
       </section>
+
+      {!loading && customers.length < total ? (
+        <div className="flex justify-center">
+          <Button
+            variant="outline"
+            onClick={() => void loadMore()}
+            disabled={loadingMore}
+          >
+            {loadingMore
+              ? 'Cargando clientes…'
+              : `Cargar más (${customers.length} de ${total})`}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
