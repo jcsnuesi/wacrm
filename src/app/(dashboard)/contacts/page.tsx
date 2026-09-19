@@ -259,7 +259,11 @@ export default function ContactsPage() {
       .eq('id', deleteTarget.id);
 
     if (error) {
-      toast.error(t('toastFailedDelete'));
+      // Keep the database reason visible to the operator. A generic toast
+      // hides actionable causes such as an unapplied FK migration or a
+      // permission policy, leaving a failed deletion impossible to diagnose.
+      console.error('Failed to delete contact:', error);
+      toast.error(`${t('toastFailedDelete')}: ${error.message}`);
     } else {
       toast.success(t('toastDeleted'));
       fetchContacts();
@@ -303,7 +307,8 @@ export default function ContactsPage() {
     const { error } = await supabase.from('contacts').delete().in('id', ids);
 
     if (error) {
-      toast.error(t('toastBulkFailedDelete'));
+      console.error('Failed to delete contacts:', error);
+      toast.error(`${t('toastBulkFailedDelete')}: ${error.message}`);
     } else {
       toast.success(t('toastBulkDeleted', { count: ids.length }));
       setSelected(new Set());

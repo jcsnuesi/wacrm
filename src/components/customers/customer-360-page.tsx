@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import {
   ArrowRight,
@@ -16,6 +16,7 @@ import {
 import { Skeleton } from '@/components/dashboard/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useRealtime } from '@/hooks/use-realtime';
 import { getCustomerDisplayName } from '@/lib/customers/customer-360';
 import type {
   Customer360ListResponse,
@@ -28,6 +29,8 @@ const CHANNEL_TONE: Record<string, string> = {
   facebook: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
   tiktok: 'bg-zinc-500/10 text-zinc-700 dark:text-zinc-300',
 };
+
+const INBOUND_REFRESH_DEBOUNCE_MS = 300;
 
 export function CustomerCard({ customer }: { customer: Customer360Summary }) {
   const displayName = getCustomerDisplayName(customer);
@@ -123,20 +126,46 @@ export function Customer360Page() {
   const [customers, setCustomers] = useState<Customer360Summary[]>([]);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const refreshCustomers = useCallback(async () => {
+    try {
+      const response = await fetch('/api/customers', { cache: 'no-store' });
+      if (!response.ok) throw new Error('Failed to load customers');
+      const payload = (await response.json()) as Customer360ListResponse;
+      setCustomers(payload.customers ?? []);
+    } catch {
+      // Keep the last successful list visible while a transient refresh fails.
+    }
+  }, []);
 
   useEffect(() => {
-    const controller = new AbortController();
-    void fetch('/api/customers', { signal: controller.signal })
-      .then(async (response) =>
-        response.ok ? response.json() : Promise.reject()
-      )
-      .then((payload: Customer360ListResponse) =>
-        setCustomers(payload.customers ?? [])
-      )
-      .catch(() => setCustomers([]))
-      .finally(() => setLoading(false));
-    return () => controller.abort();
-  }, []);
+    void refreshCustomers().finally(() => setLoading(false));
+  }, [refreshCustomers]);
+
+  const scheduleInboundRefresh = useCallback(() => {
+    if (refreshTimerRef.current) return;
+    refreshTimerRef.current = setTimeout(() => {
+      refreshTimerRef.current = null;
+      void refreshCustomers();
+    }, INBOUND_REFRESH_DEBOUNCE_MS);
+  }, [refreshCustomers]);
+
+  // A new inbound creates/updates a conversation and a message. Listening to
+  // both covers every provider path while the debounce turns that burst into
+  // one list refresh. RLS scopes Realtime events to the signed-in account.
+  useRealtime({
+    channelName: 'customer-360-inbound-refresh',
+    onMessageEvent: scheduleInboundRefresh,
+    onConversationEvent: scheduleInboundRefresh,
+  });
+
+  useEffect(
+    () => () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    },
+    []
+  );
 
   const visible = useMemo(() => {
     const needle = query.trim().toLowerCase();
