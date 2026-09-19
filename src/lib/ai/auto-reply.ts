@@ -14,10 +14,12 @@ interface DispatchArgs {
   /** Tenancy key — drives config, contact, and whatsapp_config lookups. */
   accountId: string
   conversationId: string
-  contactId: string
+  contactId?: string | null
   /** The account's WhatsApp config owner, used for the outbound send's
    *  audit columns (mirrors how the flow runner passes it through). */
-  configOwnerUserId: string
+  configOwnerUserId?: string
+  /** Provider-specific sender for canonical social conversations. */
+  sendText?: (text: string) => Promise<void>
 }
 
 /**
@@ -42,7 +44,7 @@ interface DispatchArgs {
 export async function dispatchInboundToAiReply(
   args: DispatchArgs,
 ): Promise<void> {
-  const { accountId, conversationId, contactId, configOwnerUserId } = args
+  const { accountId, conversationId, contactId, configOwnerUserId, sendText } = args
 
   try {
     const db = supabaseAdmin()
@@ -179,6 +181,13 @@ export async function dispatchInboundToAiReply(
     }
     if (claimed !== true) return // lost the per-conversation cap race
 
+    if (sendText) {
+      await sendText(text)
+      return
+    }
+    if (!contactId || !configOwnerUserId) {
+      throw new Error('WhatsApp AI reply is missing its legacy contact context.')
+    }
     await engineSendText({
       accountId,
       userId: configOwnerUserId,

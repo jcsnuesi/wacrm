@@ -8,6 +8,7 @@ export interface NormalizedInboundEvent {
   externalMessageId: string;
   username?: string | null;
   displayName?: string | null;
+  profilePictureUrl?: string | null;
   phone?: string | null;
   email?: string | null;
   messageType: string;

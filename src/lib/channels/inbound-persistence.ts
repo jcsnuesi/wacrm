@@ -3,6 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { NormalizedInboundEvent } from './provider';
 
 type ChannelAccount = { id: string; account_id: string };
+export type PersistedInboundEvent = {
+  conversationId: string;
+  customerId: string;
+  identityId: string;
+  inserted: boolean;
+};
 
 /**
  * Writes a provider-normalized inbound event into the canonical model. This
@@ -12,7 +18,7 @@ type ChannelAccount = { id: string; account_id: string };
 export async function persistInboundEvent(
   supabase: SupabaseClient,
   event: NormalizedInboundEvent
-): Promise<void> {
+): Promise<PersistedInboundEvent> {
   const { data: channelAccount, error: accountError } = await supabase
     .from('channel_accounts')
     .select('id, account_id')
@@ -78,16 +84,24 @@ export async function persistInboundEvent(
 
   let identityId = currentIdentity?.id as string | undefined;
   if (identityId) {
+    // Preserve the last successfully fetched social profile when Meta is
+    // temporarily unavailable or a later webhook does not include profile
+    // fields. A failed enrichment must never turn a known user back into
+    // "Unknown".
+    const identityUpdate: Record<string, unknown> = {
+      customer_id: customerId,
+      last_seen_at: event.occurredAt,
+    };
+    if (event.username) identityUpdate.username = event.username;
+    if (event.displayName) identityUpdate.display_name = event.displayName;
+    if (event.phone) identityUpdate.phone = event.phone;
+    if (event.email) identityUpdate.email = event.email;
+    if (event.profilePictureUrl) {
+      identityUpdate.profile_picture_url = event.profilePictureUrl;
+    }
     const { error } = await supabase
       .from('contact_identities')
-      .update({
-        customer_id: customerId,
-        username: event.username ?? null,
-        display_name: event.displayName ?? null,
-        phone: event.phone ?? null,
-        email: event.email ?? null,
-        last_seen_at: event.occurredAt,
-      })
+      .update(identityUpdate)
       .eq('id', identityId);
     if (error) throw error;
   } else {
@@ -103,6 +117,7 @@ export async function persistInboundEvent(
         display_name: event.displayName ?? null,
         phone: event.phone ?? null,
         email: event.email ?? null,
+        profile_picture_url: event.profilePictureUrl ?? null,
         metadata: { provider_payload: event.rawPayload },
         first_seen_at: event.occurredAt,
         last_seen_at: event.occurredAt,
@@ -161,7 +176,10 @@ export async function persistInboundEvent(
     .eq('conversation_id', conversationId)
     .eq('external_message_id', event.externalMessageId)
     .maybeSingle();
-  if (previousError || previous) return;
+  if (previousError) throw previousError;
+  if (previous) {
+    return { conversationId, customerId, identityId, inserted: false };
+  }
 
   const { error: messageError } = await supabase.from('messages').insert({
     conversation_id: conversationId,
@@ -178,4 +196,5 @@ export async function persistInboundEvent(
     status: 'sent',
   });
   if (messageError) throw messageError;
+  return { conversationId, customerId, identityId, inserted: true };
 }

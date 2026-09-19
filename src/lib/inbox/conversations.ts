@@ -12,7 +12,7 @@ export function getConversationHref(conversationId: string): string {
  * flattens them onto `contact.tags`.
  */
 export const CONVERSATION_SELECT =
-  '*, contact:contacts(*, contact_tags(tags(*))), customer:customers(id, account_id, display_name, first_name, last_name, email, phone, created_at, updated_at), customer_identity:contact_identities(id, channel, external_id, username, display_name, phone), channel_account:channel_accounts(channel, display_name, username), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
+  '*, contact:contacts(*, contact_tags(tags(*))), customer:customers(id, account_id, display_name, first_name, last_name, email, phone, created_at, updated_at), customer_identity:contact_identities(id, channel, external_id, username, display_name, phone, profile_picture_url), channel_account:channel_accounts(channel, display_name, username), whatsapp_config:whatsapp_config(id, provider, phone_number_id, sender_phone, status)';
 
 /** Raw shape returned by {@link CONVERSATION_SELECT} before flattening. */
 type RawContact = Contact & { contact_tags?: { tags: Tag | null }[] };
@@ -33,6 +33,7 @@ type RawCustomerIdentity = {
   username?: string | null;
   display_name?: string | null;
   phone?: string | null;
+  profile_picture_url?: string | null;
 };
 type RawConversation = Omit<Conversation, 'contact' | 'contact_id'> & {
   // Canonical social conversations do not have a legacy contacts row.
@@ -66,6 +67,7 @@ function customerAsInboxContact(
     whatsapp_username: identity?.username ?? null,
     name: name || undefined,
     email: customer.email ?? undefined,
+    avatar_url: identity?.profile_picture_url ?? undefined,
     created_at: customer.created_at,
     updated_at: customer.updated_at,
     tags: [],

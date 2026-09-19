@@ -112,6 +112,17 @@ describe('dispatchInboundToAiReply — eligibility gates', () => {
     )
   })
 
+  it('uses a provider-specific sender for a canonical social conversation', async () => {
+    const sendText = vi.fn().mockResolvedValue(undefined)
+    await dispatchInboundToAiReply({
+      accountId: 'acct-1',
+      conversationId: 'conv-social-1',
+      sendText,
+    })
+    expect(sendText).toHaveBeenCalledWith('Hello!')
+    expect(h.engineSendText).not.toHaveBeenCalled()
+  })
+
   it('grounds the reply in retrieved knowledge', async () => {
     h.retrieveKnowledge.mockResolvedValue(['Returns accepted within 30 days.'])
     await dispatchInboundToAiReply(ARGS)
