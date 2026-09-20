@@ -14,7 +14,8 @@ import { checkRateLimit, RATE_LIMITS } from '@/lib/rate-limit';
 interface DispatchPipelineRoutingArgs {
   accountId: string;
   conversationId: string;
-  contactId: string;
+  contactId?: string | null;
+  customerId?: string | null;
   sourceMessageId: string;
 }
 
@@ -154,7 +155,8 @@ async function loadRoutingMessages(
 export async function dispatchInboundToAiPipeline(
   args: DispatchPipelineRoutingArgs
 ): Promise<void> {
-  const { accountId, conversationId, contactId, sourceMessageId } = args;
+  const { accountId, conversationId, contactId, customerId, sourceMessageId } =
+    args;
   try {
     const db = supabaseAdmin();
     const [routingConfig, aiConfig] = await Promise.all([
@@ -175,6 +177,17 @@ export async function dispatchInboundToAiPipeline(
       });
       return;
     }
+
+    const { data: conversation, error: conversationError } = await db
+      .from('conversations')
+      .select('contact_id, customer_id')
+      .eq('id', conversationId)
+      .eq('account_id', accountId)
+      .maybeSingle();
+    if (conversationError || !conversation) return;
+    const resolvedContactId = contactId ?? conversation.contact_id ?? null;
+    const resolvedCustomerId = customerId ?? conversation.customer_id ?? null;
+    if (!resolvedCustomerId) return;
 
     const messages = await loadRoutingMessages(db, conversationId);
     if (!messages.some((message) => message.id === sourceMessageId)) return;
@@ -201,7 +214,8 @@ export async function dispatchInboundToAiPipeline(
           config_id: routingConfig.id,
           source_message_id: sourceMessageId,
           conversation_id: conversationId,
-          contact_id: contactId,
+          contact_id: resolvedContactId,
+          customer_id: resolvedCustomerId,
           pipeline_id: routingConfig.pipelineId,
           proposed_stage_id: null,
           intent: 'unknown',
@@ -242,7 +256,8 @@ export async function dispatchInboundToAiPipeline(
         config_id: routingConfig.id,
         source_message_id: sourceMessageId,
         conversation_id: conversationId,
-        contact_id: contactId,
+        contact_id: resolvedContactId,
+        customer_id: resolvedCustomerId,
         pipeline_id: routingConfig.pipelineId,
         proposed_stage_id: proposedRule?.stageId ?? null,
         intent: proposedRule ? classification.intent : 'unknown',

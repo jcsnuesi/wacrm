@@ -4,6 +4,7 @@ import { persistInboundEvent } from './inbound-persistence';
 import { getInstagramProfile } from './instagram/profile';
 import { sendInstagramText } from './instagram/send';
 import { dispatchInboundToAiReply } from '@/lib/ai/auto-reply';
+import { dispatchInboundToAiPipeline } from '@/lib/ai/pipeline-routing';
 import type { ChannelProvider } from './provider';
 import type { Channel } from './types';
 
@@ -43,12 +44,21 @@ export async function processMetaWebhook(
       .maybeSingle();
     if (error) throw error;
     if (!channelAccount) {
-      console.warn(`[${channel} webhook] no connected account for receiver`, externalAccountId);
+      console.warn(
+        `[${channel} webhook] no connected account for receiver`,
+        externalAccountId
+      );
       continue;
     }
     const connectedAccount = channelAccount as ConnectedChannelAccount;
-    const events = provider.parseWebhook({ entry: [entry] }, connectedAccount.id);
-    const profiles = new Map<string, Awaited<ReturnType<typeof getInstagramProfile>>>();
+    const events = provider.parseWebhook(
+      { entry: [entry] },
+      connectedAccount.id
+    );
+    const profiles = new Map<
+      string,
+      Awaited<ReturnType<typeof getInstagramProfile>>
+    >();
     for (const event of events) {
       if (channel === 'instagram') {
         let profile = profiles.get(event.externalUserId);
@@ -66,7 +76,19 @@ export async function processMetaWebhook(
         }
       }
       const persisted = await persistInboundEvent(supabase, event);
-      if (channel !== 'instagram' || !persisted.inserted || !event.text?.trim()) {
+      if (persisted.inserted) {
+        await dispatchInboundToAiPipeline({
+          accountId: connectedAccount.account_id,
+          conversationId: persisted.conversationId,
+          customerId: persisted.customerId,
+          sourceMessageId: persisted.messageId,
+        });
+      }
+      if (
+        channel !== 'instagram' ||
+        !persisted.inserted ||
+        !event.text?.trim()
+      ) {
         continue;
       }
 
@@ -84,18 +106,20 @@ export async function processMetaWebhook(
             text,
           });
           const sentAt = new Date().toISOString();
-          const { error: messageError } = await supabase.from('messages').insert({
-            conversation_id: persisted.conversationId,
-            sender_type: 'bot',
-            content_type: 'text',
-            content_text: text,
-            message_id: externalMessageId,
-            external_message_id: externalMessageId,
-            direction: 'OUTBOUND',
-            status: 'sent',
-            sent_at: sentAt,
-            ai_generated: true,
-          });
+          const { error: messageError } = await supabase
+            .from('messages')
+            .insert({
+              conversation_id: persisted.conversationId,
+              sender_type: 'bot',
+              content_type: 'text',
+              content_text: text,
+              message_id: externalMessageId,
+              external_message_id: externalMessageId,
+              direction: 'OUTBOUND',
+              status: 'sent',
+              sent_at: sentAt,
+              ai_generated: true,
+            });
           if (messageError) throw messageError;
           const { error: conversationError } = await supabase
             .from('conversations')

@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     }
     const { data: conversation } = await supabase
       .from('conversations')
-      .select('id, contact_id')
+      .select('id, contact_id, customer_id')
       .eq('id', conversationId)
       .eq('account_id', accountId)
       .maybeSingle();
@@ -55,6 +55,24 @@ export async function GET(request: Request) {
     const pipelineIds = Array.from(
       new Set(rows.map((event) => event.pipeline_id))
     );
+    const eligibleDealsQuery = pipelineIds.length
+      ? supabase
+          .from('deals')
+          .select('id, title, pipeline_id, stage_id, status')
+          .eq('account_id', accountId)
+          .eq('status', 'open')
+          .in('pipeline_id', pipelineIds)
+          .order('created_at', { ascending: false })
+      : null;
+
+    if (eligibleDealsQuery) {
+      if (conversation.customer_id) {
+        eligibleDealsQuery.eq('customer_id', conversation.customer_id);
+      } else {
+        eligibleDealsQuery.eq('contact_id', conversation.contact_id);
+      }
+    }
+
     const [{ data: stages }, { data: deals }] = await Promise.all([
       stageIds.length
         ? supabase
@@ -62,16 +80,7 @@ export async function GET(request: Request) {
             .select('id, name, position')
             .in('id', stageIds)
         : Promise.resolve({ data: [] }),
-      pipelineIds.length
-        ? supabase
-            .from('deals')
-            .select('id, title, pipeline_id, stage_id, status')
-            .eq('account_id', accountId)
-            .eq('contact_id', conversation.contact_id)
-            .eq('status', 'open')
-            .in('pipeline_id', pipelineIds)
-            .order('created_at', { ascending: false })
-        : Promise.resolve({ data: [] }),
+      eligibleDealsQuery ?? Promise.resolve({ data: [] }),
     ]);
     const stageMap = Object.fromEntries(
       (stages ?? []).map((stage) => [stage.id, stage])

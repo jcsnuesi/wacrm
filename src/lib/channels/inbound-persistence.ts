@@ -7,6 +7,7 @@ export type PersistedInboundEvent = {
   conversationId: string;
   customerId: string;
   identityId: string;
+  messageId: string;
   inserted: boolean;
 };
 
@@ -128,13 +129,15 @@ export async function persistInboundEvent(
     identityId = identity.id as string;
   }
 
-  const externalConversationId = event.externalConversationId ?? event.externalUserId;
-  const { data: existingConversation, error: findConversationError } = await supabase
-    .from('conversations')
-    .select('id')
-    .eq('channel_account_id', account.id)
-    .eq('external_conversation_id', externalConversationId)
-    .maybeSingle();
+  const externalConversationId =
+    event.externalConversationId ?? event.externalUserId;
+  const { data: existingConversation, error: findConversationError } =
+    await supabase
+      .from('conversations')
+      .select('id')
+      .eq('channel_account_id', account.id)
+      .eq('external_conversation_id', externalConversationId)
+      .maybeSingle();
   if (findConversationError) throw findConversationError;
 
   let conversationId = existingConversation?.id as string | undefined;
@@ -178,23 +181,39 @@ export async function persistInboundEvent(
     .maybeSingle();
   if (previousError) throw previousError;
   if (previous) {
-    return { conversationId, customerId, identityId, inserted: false };
+    return {
+      conversationId,
+      customerId,
+      identityId,
+      messageId: previous.id as string,
+      inserted: false,
+    };
   }
 
-  const { error: messageError } = await supabase.from('messages').insert({
-    conversation_id: conversationId,
-    sender_type: 'customer',
-    content_type: event.messageType,
-    content_text: event.text ?? null,
-    media_url: event.media?.url ?? null,
-    message_id: event.externalMessageId,
-    external_message_id: event.externalMessageId,
-    direction: 'INBOUND',
-    sender_identity_id: identityId,
-    metadata: { provider_payload: event.rawPayload },
-    sent_at: event.occurredAt,
-    status: 'sent',
-  });
-  if (messageError) throw messageError;
-  return { conversationId, customerId, identityId, inserted: true };
+  const { data: message, error: messageError } = await supabase
+    .from('messages')
+    .insert({
+      conversation_id: conversationId,
+      sender_type: 'customer',
+      content_type: event.messageType,
+      content_text: event.text ?? null,
+      media_url: event.media?.url ?? null,
+      message_id: event.externalMessageId,
+      external_message_id: event.externalMessageId,
+      direction: 'INBOUND',
+      sender_identity_id: identityId,
+      metadata: { provider_payload: event.rawPayload },
+      sent_at: event.occurredAt,
+      status: 'sent',
+    })
+    .select('id')
+    .single();
+  if (messageError || !message) throw messageError;
+  return {
+    conversationId,
+    customerId,
+    identityId,
+    messageId: message.id as string,
+    inserted: true,
+  };
 }

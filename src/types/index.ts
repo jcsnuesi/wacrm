@@ -431,6 +431,10 @@ export interface Deal {
    * contact is deleted (ON DELETE SET NULL). History preserved.
    */
   contact_id: string | null;
+  /** Canonical Customer 360 owner; required for social-channel deals. */
+  customer_id?: string | null;
+  /** Inbound channel that originated this deal, e.g. whatsapp/instagram. */
+  source_channel?: string | null;
   conversation_id?: string;
   assigned_to?: string;
   title: string;
@@ -442,6 +446,12 @@ export interface Deal {
   created_at: string;
   updated_at?: string;
   contact?: Contact;
+  customer?: {
+    id: string;
+    display_name?: string | null;
+    phone?: string | null;
+    email?: string | null;
+  };
   stage?: PipelineStage;
   assignee?: Profile;
 }
