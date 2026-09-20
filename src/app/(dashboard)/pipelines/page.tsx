@@ -1,12 +1,18 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import type { Pipeline, PipelineStage, Deal } from '@/types';
 import { PipelineBoard } from '@/components/pipelines/pipeline-board';
 import { PipelineSettings } from '@/components/pipelines/pipeline-settings';
 import { DealForm } from '@/components/pipelines/deal-form';
 import { PipelineAnalytics } from '@/components/pipelines/pipeline-analytics';
+import { ChannelIndicator } from '@/components/inbox/channel-indicator';
+import {
+  getDealChannel,
+  PIPELINE_CHANNELS,
+  type PipelineChannelFilter,
+} from '@/lib/pipelines/deal-channel';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,7 +30,20 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { GitBranch, Plus, ChevronDown, Settings } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  GitBranch,
+  Plus,
+  ChevronDown,
+  Settings,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useCan } from '@/hooks/use-can';
 import { useAuth } from '@/hooks/use-auth';
@@ -56,6 +75,8 @@ export default function PipelinesPage() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('');
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [deals, setDeals] = useState<Deal[]>([]);
+  const [channelFilter, setChannelFilter] =
+    useState<PipelineChannelFilter>('all');
   const [loading, setLoading] = useState(true);
 
   // Dialog / sheet state
@@ -102,7 +123,7 @@ export default function PipelinesPage() {
       const { data } = await supabase
         .from('deals')
         .select(
-          '*, contact:contacts(*), customer:customers(id, display_name, phone, email), assignee:profiles!deals_assigned_to_fkey(*)'
+          '*, contact:contacts(*), customer:customers!deals_customer_id_fkey(id, display_name, phone, email, contact_identities(id, channel, username, display_name, phone)), assignee:profiles!deals_assigned_to_fkey(*)'
         )
         .eq('pipeline_id', pipelineId)
         .order('created_at', { ascending: false });
@@ -303,6 +324,13 @@ export default function PipelinesPage() {
   }
 
   const selectedPipeline = pipelines.find((p) => p.id === selectedPipelineId);
+  const filteredDeals = useMemo(
+    () =>
+      channelFilter === 'all'
+        ? deals
+        : deals.filter((deal) => getDealChannel(deal) === channelFilter),
+    [channelFilter, deals]
+  );
 
   if (loading) {
     return (
@@ -372,6 +400,25 @@ export default function PipelinesPage() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
+          <Select
+            value={channelFilter}
+            onValueChange={(value) =>
+              setChannelFilter(value as PipelineChannelFilter)
+            }
+          >
+            <SelectTrigger className="border-border bg-card text-foreground min-w-40">
+              <SlidersHorizontal className="text-muted-foreground size-3.5" />
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('allChannels')}</SelectItem>
+              {PIPELINE_CHANNELS.map((channel) => (
+                <SelectItem key={channel} value={channel}>
+                  <ChannelIndicator channel={channel} withLabel />
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <div className="flex items-center gap-2">
@@ -425,7 +472,7 @@ export default function PipelinesPage() {
           </div>
           <PipelineBoard
             stages={stages}
-            deals={deals}
+            deals={filteredDeals}
             onDealMoved={handleDealMoved}
             onAddDeal={handleAddDeal}
             onEditDeal={handleEditDeal}

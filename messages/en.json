@@ -513,7 +513,8 @@
       "toastFailedMoveDeal": "Failed to move deal",
       "toastFailedCreatePipeline": "Failed to create pipeline",
       "toastPipelineCreated": "Pipeline created",
-      "toastNotLinkedToAccount": "Your profile is not linked to an account."
+      "toastNotLinkedToAccount": "Your profile is not linked to an account.",
+      "allChannels": "All channels"
     },
     "board": {
       "dropDealHere": "Drop a deal here",
@@ -603,6 +604,7 @@
       "wonThisMonthTooltip": "Deals marked as Won since the first day of the current month.",
       "lostThisMonth": "Lost This Month",
       "lostThisMonthTooltip": "Deals marked as Lost since the first day of the current month.",
+      "customersByChannel": "customers",
       "howCalculated": "How {label} is calculated"
     }
   },

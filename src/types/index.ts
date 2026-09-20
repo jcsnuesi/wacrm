@@ -451,6 +451,14 @@ export interface Deal {
     display_name?: string | null;
     phone?: string | null;
     email?: string | null;
+    /** Provider identities used when a social customer has no profile name. */
+    contact_identities?: Array<{
+      id: string;
+      channel?: string | null;
+      username?: string | null;
+      display_name?: string | null;
+      phone?: string | null;
+    }>;
   };
   stage?: PipelineStage;
   assignee?: Profile;

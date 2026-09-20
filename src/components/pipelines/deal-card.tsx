@@ -1,8 +1,11 @@
 'use client';
 
 import type { Deal, PipelineStage } from '@/types';
-import { Calendar, Check, MessageCircle, X } from 'lucide-react';
+import { Calendar, Check, X } from 'lucide-react';
 import { formatCurrency } from '@/lib/currency';
+import { getDealChannel } from '@/lib/pipelines/deal-channel';
+import { getDealContactLabel } from '@/lib/pipelines/deal-contact';
+import { ChannelIndicator } from '@/components/inbox/channel-indicator';
 import { useTranslations } from 'next-intl';
 
 interface DealCardProps {
@@ -28,13 +31,8 @@ function initials(name?: string, fallback?: string) {
 
 export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
   const t = useTranslations('Pipelines.card');
-  const contactLabel =
-    deal.customer?.display_name ||
-    deal.contact?.name ||
-    deal.customer?.phone ||
-    deal.contact?.phone ||
-    t('noContact');
-  const channelLabel = deal.source_channel?.trim().toLowerCase() || 'whatsapp';
+  const contactLabel = getDealContactLabel(deal) ?? t('noContact');
+  const channel = getDealChannel(deal);
   const assigneeLabel = deal.assignee?.full_name || null;
 
   return (
@@ -89,8 +87,7 @@ export function DealCard({ deal, stage, onEdit, isOverlay }: DealCardProps) {
       </div>
 
       <div className="text-muted-foreground mt-2 flex items-center gap-1.5 text-[11px]">
-        <MessageCircle aria-hidden="true" className="h-3 w-3" />
-        <span className="capitalize">{channelLabel}</span>
+        <ChannelIndicator channel={channel} withLabel />
       </div>
 
       <div className="mt-2 flex items-center justify-between">

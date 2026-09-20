@@ -19,6 +19,11 @@ import {
 } from "@/components/ui/tooltip";
 import { useAuth } from "@/hooks/use-auth";
 import { formatCurrency } from "@/lib/currency";
+import {
+  getChannelCustomerCounts,
+  type PipelineChannel,
+} from "@/lib/pipelines/deal-channel";
+import { ChannelIndicator } from "@/components/inbox/channel-indicator";
 import { useTranslations } from "next-intl";
 
 interface PipelineAnalyticsProps {
@@ -92,6 +97,10 @@ export function PipelineAnalytics({ stages, deals }: PipelineAnalyticsProps) {
       lostThisMonth,
     };
   }, [deals, sortedStages]);
+  const channelCustomerCounts = useMemo(
+    () => getChannelCustomerCounts(deals),
+    [deals],
+  );
 
   return (
     <TooltipProvider>
@@ -139,7 +148,39 @@ export function PipelineAnalytics({ stages, deals }: PipelineAnalyticsProps) {
           t={t}
         />
       </div>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {channelCustomerCounts.map(({ channel, count }) => (
+          <ChannelCustomerMetric
+            key={channel}
+            channel={channel}
+            count={count}
+            label={t("customersByChannel")}
+          />
+        ))}
+      </div>
     </TooltipProvider>
+  );
+}
+
+function ChannelCustomerMetric({
+  channel,
+  count,
+  label,
+}: {
+  channel: PipelineChannel;
+  count: number;
+  label: string;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-xl border border-border bg-card/60 px-4 py-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+        <ChannelIndicator channel={channel} withLabel />
+        <span className="text-xs text-muted-foreground">{label}</span>
+      </div>
+      <span className="text-xl font-semibold tabular-nums text-foreground">
+        {count}
+      </span>
+    </div>
   );
 }
 
