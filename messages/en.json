@@ -137,6 +137,8 @@
       "filterOpen": "Open",
       "filterPending": "Pending",
       "filterClosed": "Closed",
+      "filterChannel": "Channel",
+      "allChannels": "All channels",
       "tags": "Tags",
       "company": "Company",
       "allCompanies": "All companies",

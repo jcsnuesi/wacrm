@@ -137,6 +137,8 @@
       "filterOpen": "열림",
       "filterPending": "대기 중",
       "filterClosed": "닫힘",
+      "filterChannel": "채널",
+      "allChannels": "모든 채널",
       "tags": "태그",
       "company": "회사",
       "allCompanies": "전체 회사",

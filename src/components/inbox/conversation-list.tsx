@@ -21,7 +21,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { ChannelIndicator, getInboxChannel } from './channel-indicator';
+import {
+  ChannelIndicator,
+  getInboxChannel,
+  type InboxChannel,
+} from './channel-indicator';
 
 interface ConversationListProps {
   activeConversationId: string | null;
@@ -39,6 +43,13 @@ interface ConversationListProps {
 
 
 type InboxFilter = ConversationStatus | "all" | "unread";
+type InboxChannelFilter = InboxChannel | "all";
+
+const INBOX_CHANNELS: InboxChannel[] = [
+  "whatsapp",
+  "instagram",
+  "facebook",
+];
 
 export function ConversationList({
   activeConversationId,
@@ -59,6 +70,7 @@ export function ConversationList({
 
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<InboxFilter>("all");
+  const [channelFilter, setChannelFilter] = useState<InboxChannelFilter>("all");
   const [loading, setLoading] = useState(true);
   // Contact-based filters (issue #272). Tags use OR logic (a conversation
   // matches if its contact carries any selected tag), consistent with
@@ -161,6 +173,12 @@ export function ConversationList({
       result = result.filter((c) => c.status === filter);
     }
 
+    if (channelFilter !== "all") {
+      result = result.filter(
+        (conversation) => getInboxChannel(conversation) === channelFilter
+      );
+    }
+
     // Contact-based filters (tags via OR logic, exact company match).
     if (selectedTagIds.length > 0 || selectedCompany !== null) {
       result = result.filter((c) =>
@@ -182,7 +200,14 @@ export function ConversationList({
     }
 
     return result;
-  }, [conversations, filter, search, selectedTagIds, selectedCompany]);
+  }, [
+    conversations,
+    filter,
+    channelFilter,
+    search,
+    selectedTagIds,
+    selectedCompany,
+  ]);
 
   const toggleTag = useCallback((id: string) => {
     setSelectedTagIds((prev) =>
@@ -252,6 +277,54 @@ export function ConversationList({
                   )}
                 >
                   {opt.label}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className={cn(
+                "inline-flex h-7 items-center justify-center gap-1 rounded-md px-2 text-xs hover:bg-muted",
+                channelFilter === "all"
+                  ? "text-muted-foreground hover:text-foreground"
+                  : "text-primary"
+              )}
+            >
+              {channelFilter === "all" ? (
+                t("filterChannel")
+              ) : (
+                <ChannelIndicator channel={channelFilter} withLabel />
+              )}
+              <ChevronDown className="h-3 w-3" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="start"
+              className="border-border bg-popover"
+            >
+              <DropdownMenuItem
+                onClick={() => setChannelFilter("all")}
+                className={cn(
+                  "text-sm",
+                  channelFilter === "all"
+                    ? "text-primary"
+                    : "text-popover-foreground"
+                )}
+              >
+                {t("allChannels")}
+              </DropdownMenuItem>
+              {INBOX_CHANNELS.map((channel) => (
+                <DropdownMenuItem
+                  key={channel}
+                  onClick={() => setChannelFilter(channel)}
+                  className={cn(
+                    "text-sm",
+                    channelFilter === channel
+                      ? "text-primary"
+                      : "text-popover-foreground"
+                  )}
+                >
+                  <ChannelIndicator channel={channel} withLabel />
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
