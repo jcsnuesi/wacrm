@@ -709,7 +709,22 @@ async function processMessage(
   // and Meta only includes it on messages originating from an ad. A capture
   // failure is isolated from inbox persistence so customers never lose a
   // message because the optional CAPI projection failed.
-  const referral = parseClickToWhatsAppReferral(message.referral);
+  const rawReferral = message.referral;
+  const referralFields =
+    rawReferral && typeof rawReferral === 'object' && !Array.isArray(rawReferral)
+      ? Object.keys(rawReferral as Record<string, unknown>).sort()
+      : [];
+  const referral = parseClickToWhatsAppReferral(rawReferral);
+  // Temporary, privacy-safe production diagnostic. Do not log the referral
+  // values: ctwa_clid is an attribution identifier and the object can also
+  // contain ad creative text. This marker lets us distinguish a Meta payload
+  // without referral data from a parser/database failure.
+  console.info('[webhook] Meta attribution probe', {
+    hasReferral: rawReferral != null,
+    referralFields,
+    hasCtwaClid: referralFields.includes('ctwa_clid'),
+    parsed: referral != null,
+  });
   const customerId = conversation.customer_id ?? contactRecord.customer_id;
   if (referral && customerId) {
     try {
