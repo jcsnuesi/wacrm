@@ -20,6 +20,10 @@ import {
   formatMetaStatusErrors,
   type MetaStatusError,
 } from '@/lib/whatsapp/meta-status-error';
+import {
+  captureClickToWhatsAppAttribution,
+  parseClickToWhatsAppReferral,
+} from '@/lib/meta/capi/attribution';
 
 // The `after()` callback in POST runs within this route's max duration.
 // Inbound processing can fan out to per-media Meta verification calls, so
@@ -78,6 +82,8 @@ interface WhatsAppMessage {
   };
   /** Present when the customer swipe-replies to one of our messages. */
   context?: { id: string };
+  /** Present when this conversation began from a Click-to-WhatsApp ad. */
+  referral?: unknown;
 }
 
 interface WhatsAppWebhookEntry {
@@ -332,6 +338,7 @@ async function processWebhook(body: { entry?: WhatsAppWebhookEntry[] }) {
           // the admin who saved the WhatsApp config.
           config.user_id,
           config.id,
+          config.waba_id ?? null,
           decryptedAccessToken
         );
       }
@@ -617,6 +624,7 @@ async function processMessage(
   // WhatsApp config; the choice is arbitrary post-017 but stable.
   configOwnerUserId: string,
   whatsappConfigId: string,
+  wabaId: string | null,
   accessToken: string
 ) {
   const whatsappUserId = cleanWhatsAppIdentifier(
@@ -693,6 +701,42 @@ async function processMessage(
         conversation_id: conversation.id,
         contact_id: contactRecord.id,
       }
+    );
+  }
+
+  // Preserve the click ID before any downstream early return. This is the
+  // strongest attribution key for Conversions API for Business Messaging
+  // and Meta only includes it on messages originating from an ad. A capture
+  // failure is isolated from inbox persistence so customers never lose a
+  // message because the optional CAPI projection failed.
+  const referral = parseClickToWhatsAppReferral(message.referral);
+  const customerId = conversation.customer_id ?? contactRecord.customer_id;
+  if (referral && customerId) {
+    try {
+      const timestampSeconds = Number(message.timestamp);
+      const timestampDate = new Date(timestampSeconds * 1000);
+      const attributedAt =
+        Number.isFinite(timestampSeconds) &&
+        !Number.isNaN(timestampDate.getTime())
+          ? timestampDate.toISOString()
+          : new Date().toISOString();
+      await captureClickToWhatsAppAttribution(supabaseAdmin(), {
+        accountId,
+        customerId,
+        conversationId: conversation.id,
+        whatsappConfigId,
+        externalMessageId: message.id,
+        wabaId,
+        attributedAt,
+        referral,
+      });
+    } catch (error) {
+      console.error('[webhook] Meta attribution capture failed:', error);
+    }
+  } else if (referral) {
+    console.warn(
+      '[webhook] Meta attribution skipped because canonical customer is missing',
+      { conversationId: conversation.id }
     );
   }
 
