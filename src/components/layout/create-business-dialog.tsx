@@ -217,34 +217,35 @@ export function CreateBusinessDialog({
         )}
         {step === 2 && (
           <div className="grid max-h-[55vh] gap-4 overflow-y-auto">
-            <fieldset className="grid gap-2">
-              <legend className="mb-2 font-medium">Plantilla inicial</legend>
-              {BUSINESS_TEMPLATES.map((item) => (
-                <label
-                  key={item.id}
-                  className="border-border flex gap-3 rounded-lg border p-3"
-                >
-                  <input
-                    type="radio"
-                    name="business-template"
+            <label className={field}>
+              Plantilla inicial
+              <select
+                aria-label="Plantilla inicial"
+                name="business-template"
+                className="border-input bg-background rounded-lg border p-2"
+                value={templateId}
+                onChange={(e) =>
+                  chooseTemplate(e.target.value as BusinessTemplateId)
+                }
+              >
+                {BUSINESS_TEMPLATES.map((item) => (
+                  <option
+                    key={item.id}
                     value={item.id}
-                    checked={templateId === item.id}
                     disabled={
                       !(item.objectives as readonly string[]).includes(
                         objective
                       )
                     }
-                    onChange={() => chooseTemplate(item.id)}
-                  />
-                  <span>
-                    <span className="block font-medium">{item.name}</span>
-                    <span className="text-muted-foreground text-sm">
-                      {item.description}
-                    </span>
-                  </span>
-                </label>
-              ))}
-            </fieldset>
+                  >
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="text-muted-foreground text-sm">
+              {template.description}
+            </p>
             {stages.length > 0 && (
               <fieldset className="grid gap-2">
                 <legend className="mb-2 font-medium">
