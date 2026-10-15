@@ -13,14 +13,14 @@ Este trabajo amplía las fases 2 y 7 del plan OaaS general. La automatización d
 
 ## Seis fases de entrega
 
-| Fase | Entrega | Criterio para darla por terminada |
-| --- | --- | --- |
-| 1. Catálogo y modelo | Separar rubro, objetivo, plantilla, versión y plan. Definir una plantilla genérica y una inmobiliaria inicial. | Cada plantilla declara sus etapas, campos compatibles, objetivos y capacidades requeridas; se puede elegir «desde cero». |
-| 2. Configuración inicial | Implementar el mecanismo que crea pipelines, etapas y campos propios del nuevo negocio, usando los recursos actuales del CRM. | La configuración se aplica sin duplicados ni datos de otros negocios; un fallo no deja un negocio configurado a medias. |
-| 3. Onboarding guiado | Incorporar rubro, objetivo, vista previa y selección de plantilla al alta desde el selector. | Playwright crea un negocio desde el mismo login, muestra su configuración y verifica el cambio de contexto. |
-| 4. Personalización y evolución | Permitir editar la configuración y evaluar cambios de plantilla con vista previa de diferencias. | Los contactos, oportunidades y ajustes existentes se conservan; etapas con datos requieren mapeo explícito antes de migrar. |
-| 5. Automatización y resultados | Añadir recetas gestionadas, objetivos medibles y controles por suscripción del negocio. | Una receta autorizada se ejecuta con registros verificables; una capacidad sin contratar permanece bloqueada en el servidor. |
-| 6. Módulos por rubro y piloto | Desarrollar los módulos que exceden la configuración del CRM, comenzar con inventario inmobiliario y ampliar el catálogo tras el piloto. | Dos negocios de rubros distintos funcionan con el mismo login, mantienen aislamiento y completan sus recorridos con evidencia visual. |
+| Fase                           | Entrega                                                                                                                                  | Criterio para darla por terminada                                                                                                     |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Catálogo y modelo           | Separar rubro, objetivo, plantilla, versión y plan. Definir una plantilla genérica y una inmobiliaria inicial.                           | Cada plantilla declara sus etapas, campos compatibles, objetivos y capacidades requeridas; se puede elegir «desde cero».              |
+| 2. Configuración inicial       | Implementar el mecanismo que crea pipelines, etapas y campos propios del nuevo negocio, usando los recursos actuales del CRM.            | La configuración se aplica sin duplicados ni datos de otros negocios; un fallo no deja un negocio configurado a medias.               |
+| 3. Onboarding guiado           | Incorporar rubro, objetivo, vista previa y selección de plantilla al alta desde el selector.                                             | Playwright crea un negocio desde el mismo login, muestra su configuración y verifica el cambio de contexto.                           |
+| 4. Personalización y evolución | Permitir editar la configuración y evaluar cambios de plantilla con vista previa de diferencias.                                         | Los contactos, oportunidades y ajustes existentes se conservan; etapas con datos requieren mapeo explícito antes de migrar.           |
+| 5. Automatización y resultados | Añadir recetas gestionadas, objetivos medibles y controles por suscripción del negocio.                                                  | Una receta autorizada se ejecuta con registros verificables; una capacidad sin contratar permanece bloqueada en el servidor.          |
+| 6. Módulos por rubro y piloto  | Desarrollar los módulos que exceden la configuración del CRM, comenzar con inventario inmobiliario y ampliar el catálogo tras el piloto. | Dos negocios de rubros distintos funcionan con el mismo login, mantienen aislamiento y completan sus recorridos con evidencia visual. |
 
 Las fases 1–3 tienen su primera implementación: catálogo General/Inmobiliaria/Desde cero, configuración transaccional por negocio y onboarding de cinco pasos con ajuste de etapas. Se registra objetivo y versión; `/plan` muestra la configuración aplicada cuando existe. Las pruebas locales de SQL verifican creación, reintentos, rollback y aislamiento. Playwright verificó las pantallas, sugerencia inmobiliaria, objetivo alquiler, edición de etapas y opción vacía; el alta en la base conectada respondió `migration_required`, sin crear una cuenta. Falta validar la cadena completa de migraciones en staging y aplicar 056–058 para completar el criterio de alta real de fase 3.
 
@@ -91,17 +91,21 @@ Resultado: evidencia funcional del recorrido por rubro y catálogo que puede amp
 
 ## Ejemplo de la primera plantilla inmobiliaria
 
-| Elemento | Configuración sugerida |
-| --- | --- |
-| Objetivo | Venta, alquiler o captación de propietarios, elegido por el usuario |
-| Pipeline de venta | Consulta → calificación → visita → oferta → negociación → cierre |
-| Campos de contacto | Tipo de interesado, zona de interés y presupuesto, según los tipos ya soportados |
-| Resultado | Cierre registrado, con métricas intermedias de oportunidades y visitas |
-| Inventario de propiedades | Módulo propuesto para fase 6; no se simula con la plantilla inicial |
-| Automatización | Recetas optativas de fase 5, sujetas a conexiones y plan |
+| Elemento                  | Configuración sugerida                                                           |
+| ------------------------- | -------------------------------------------------------------------------------- |
+| Objetivo                  | Venta, alquiler o captación de propietarios, elegido por el usuario              |
+| Pipeline de venta         | Consulta → calificación → visita → oferta → negociación → cierre                 |
+| Campos de contacto        | Tipo de interesado, zona de interés y presupuesto, según los tipos ya soportados |
+| Resultado                 | Cierre registrado, con métricas intermedias de oportunidades y visitas           |
+| Inventario de propiedades | Módulo propuesto para fase 6; no se simula con la plantilla inicial              |
+| Automatización            | Recetas optativas de fase 5, sujetas a conexiones y plan                         |
 
 ## Orden y validación
 
 Completar fases 1 → 2 → 3 para el primer piloto. Continuar con personalización, automatización y módulos específicos según sus dependencias. No se fija una fecha de despliegue hasta validar el entorno conectado y el alcance de la primera plantilla.
 
 Las comprobaciones de aceptación cubrirán aislamiento por negocio, permisos, aplicación atómica, reintentos, conservación de datos y bloqueo de funciones no contratadas. Las capturas Playwright deberán distinguir funcionalidad operativa de pantallas pendientes de activación.
+
+# Actualización operativa
+
+La habilitación de módulos se basa ahora en actividad principal y actividades adicionales, elegidas mediante select y controles adicionales. Consulte [el plan de ocho fases](PLAN_ACTIVIDADES_OPERACION_FINANZAS.md) para implementación, pruebas y activación pendiente. Las plantillas conservan su función de configuración inicial de etapas y objetivo.

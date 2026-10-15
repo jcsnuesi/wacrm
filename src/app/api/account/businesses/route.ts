@@ -6,6 +6,7 @@ import {
 } from '@/lib/auth/active-account';
 import { CURRENCIES } from '@/lib/currency';
 import { PLAN_KEYS } from '@/lib/billing/plans';
+import { validActivities } from '@/lib/operations/catalog';
 import {
   getBusinessTemplate,
   validStageNames,
@@ -56,6 +57,25 @@ export async function POST(request: Request) {
     }
     const template = getBusinessTemplate(body.template_id);
     if (
+      !validActivities(body.primary_activity, body.additional_activities) ||
+      typeof body.timezone !== 'string' ||
+      typeof body.professional_label !== 'string' ||
+      !body.professional_label.trim() ||
+      body.professional_label.length > 40
+    )
+      return NextResponse.json(
+        { error: 'Revisa las actividades y el nombre del profesional.' },
+        { status: 400 }
+      );
+    try {
+      new Intl.DateTimeFormat('en', { timeZone: body.timezone }).format();
+    } catch {
+      return NextResponse.json(
+        { error: 'Zona horaria no válida.' },
+        { status: 400 }
+      );
+    }
+    if (
       !template ||
       body.template_version !== template.version ||
       !(template.objectives as readonly string[]).includes(body.objective) ||
@@ -66,26 +86,27 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
-    const { data, error } = await ctx.supabase.rpc(
-      'create_business_with_template',
-      {
-        p_name: name,
-        p_industry: industry,
-        p_currency: body.currency,
-        p_requested_plan: body.plan,
-        p_request_id: body.request_id,
-        p_template_id: template.id,
-        p_template_version: template.version,
-        p_objective: body.objective,
-        p_stage_names: body.stage_names.map((name: string) => name.trim()),
-      }
-    );
+    const { data, error } = await ctx.supabase.rpc('create_activity_business', {
+      p_name: name,
+      p_industry: industry,
+      p_currency: body.currency,
+      p_requested_plan: body.plan,
+      p_request_id: body.request_id,
+      p_template_id: template.id,
+      p_template_version: template.version,
+      p_objective: body.objective,
+      p_stage_names: body.stage_names.map((name: string) => name.trim()),
+      p_primary_activity: body.primary_activity,
+      p_additional_activities: body.additional_activities,
+      p_timezone: body.timezone,
+      p_professional_label: body.professional_label.trim(),
+    });
     if (error) {
       if (['PGRST202', '42883'].includes(error.code))
         return NextResponse.json(
           {
             error:
-              'El alta con plantillas necesita activar las migraciones 057 y 058 en Supabase.',
+              'El alta por actividades necesita activar las migraciones 056–060 en Supabase.',
             code: 'migration_required',
           },
           { status: 503 }

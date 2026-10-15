@@ -22,6 +22,12 @@ export const ROLE_META: Record<
   AccountRole,
   { icon: LucideIcon; label: string; variant: ChipVariant; className: string }
 > = {
+  professional: {
+    icon: UserIcon,
+    label: 'professional',
+    variant: 'muted',
+    className: 'border-border bg-muted text-muted-foreground',
+  },
   owner: {
     icon: Crown,
     label: 'owner',

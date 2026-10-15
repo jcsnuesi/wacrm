@@ -67,6 +67,8 @@
     "unreadConversations": "읽지 않은 대화 {count}건",
     "unreadNotifications": "읽지 않은 알림 {count}건",
     "roleOwner": "소유자",
+    "roleProfessional": "전문가",
+    "operations": "운영",
     "roleAdmin": "관리자",
     "roleAgent": "상담원",
     "roleViewer": "뷰어",
@@ -78,6 +80,7 @@
     "menuSignOut": "로그아웃"
   },
   "Header": {
+    "operations": "운영",
     "businessPlan": "비즈니스 플랜",
     "dashboard": "대시보드",
     "inbox": "인박스",
@@ -1493,6 +1496,8 @@
       "toastUploadFailed": "업로드에 실패했습니다."
     },
     "roles": {
+      "professional": "전문가",
+      "professionalHint": "본인의 예약 및 활동만 접근 가능",
       "admin": "관리자",
       "adminHint": "멤버 관리 + 모든 기능",
       "agent": "상담원",

@@ -20,6 +20,10 @@ const valid = {
   template_version: 1,
   objective: 'sell',
   stage_names: ['Consulta', 'Cierre'],
+  primary_activity: 'services',
+  additional_activities: ['products'],
+  timezone: 'America/Santo_Domingo',
+  professional_label: 'Barbero',
 };
 const request = (body: unknown, origin = 'http://localhost') =>
   new Request('http://localhost/api/account/businesses', {
@@ -46,7 +50,7 @@ describe('new business API', () => {
       })
     );
     expect(response.status).toBe(201);
-    expect(mocks.rpc).toHaveBeenCalledWith('create_business_with_template', {
+    expect(mocks.rpc).toHaveBeenCalledWith('create_activity_business', {
       p_name: valid.name,
       p_industry: valid.industry,
       p_currency: 'USD',
@@ -56,6 +60,10 @@ describe('new business API', () => {
       p_template_version: 1,
       p_objective: 'sell',
       p_stage_names: valid.stage_names,
+      p_primary_activity: 'services',
+      p_additional_activities: ['products'],
+      p_timezone: 'America/Santo_Domingo',
+      p_professional_label: 'Barbero',
     });
   });
   it('rejects unauthenticated creation', async () => {

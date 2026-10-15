@@ -6,6 +6,11 @@ import { useAuth } from '@/hooks/use-auth';
 import { CURRENCIES } from '@/lib/currency';
 import type { PlanKey } from '@/lib/billing/plans';
 import {
+  ACTIVITIES,
+  activityModules,
+  type Activity,
+} from '@/lib/operations/catalog';
+import {
   BUSINESS_TEMPLATES,
   OBJECTIVES,
   getBusinessTemplate,
@@ -57,6 +62,12 @@ export function CreateBusinessDialog({
   const [industry, setIndustry] = useState('');
   const [currency, setCurrency] = useState('USD');
   const [plan, setPlan] = useState<PlanKey>('crm');
+  const [primaryActivity, setPrimaryActivity] = useState<Activity>('services');
+  const [additionalActivities, setAdditionalActivities] = useState<Activity[]>(
+    []
+  );
+  const [professionalLabel, setProfessionalLabel] = useState('Profesional');
+  const [timezone, setTimezone] = useState('America/Santo_Domingo');
   const [objective, setObjective] = useState<BusinessObjective>('sell');
   const [templateId, setTemplateId] = useState<BusinessTemplateId>('generic');
   const [stages, setStages] = useState<string[]>(
@@ -85,6 +96,10 @@ export function CreateBusinessDialog({
             industry,
             currency,
             plan,
+            primary_activity: primaryActivity,
+            additional_activities: additionalActivities,
+            professional_label: professionalLabel,
+            timezone,
             template_id: templateId,
             template_version: template.version,
             objective,
@@ -107,11 +122,14 @@ export function CreateBusinessDialog({
       setName('');
       setIndustry('');
       setPlan('crm');
+      setPrimaryActivity('services');
+      setAdditionalActivities([]);
+      setProfessionalLabel('Profesional');
       setObjective('sell');
       chooseTemplate('generic', 'sell');
       requestId.current = null;
       createdAccount.current = null;
-      router.push('/plan');
+      router.push('/operations');
       router.refresh();
     } catch (e) {
       setError(
@@ -129,7 +147,10 @@ export function CreateBusinessDialog({
         if (!busy) onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-xl" showCloseButton={!busy}>
+      <DialogContent
+        className="max-h-[90vh] overflow-y-auto sm:max-w-xl"
+        showCloseButton={!busy}
+      >
         <DialogHeader>
           <DialogTitle>Crear negocio</DialogTitle>
           <DialogDescription>
@@ -154,10 +175,6 @@ export function CreateBusinessDialog({
                 onChange={(e) => {
                   const value = e.target.value;
                   setIndustry(value);
-                  if (/inmobiliari/i.test(value)) {
-                    setObjective('sell');
-                    chooseTemplate('real_estate', 'sell');
-                  }
                 }}
                 maxLength={80}
                 list="business-industries"
@@ -185,6 +202,85 @@ export function CreateBusinessDialog({
                 ))}
               </select>
             </label>
+            <label className={field}>
+              Actividad principal
+              <select
+                aria-label="Actividad principal"
+                className="border-input bg-background rounded-lg border p-2"
+                value={primaryActivity}
+                onChange={(e) => {
+                  const activity = e.target.value as Activity;
+                  setPrimaryActivity(activity);
+                  setAdditionalActivities(
+                    additionalActivities.filter((a) => a !== activity)
+                  );
+                }}
+              >
+                {ACTIVITIES.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <fieldset className="grid gap-2">
+              <legend>Actividades adicionales</legend>
+              {ACTIVITIES.filter((a) => a.id !== primaryActivity).map((a) => (
+                <label className="flex gap-2" key={a.id}>
+                  <input
+                    type="checkbox"
+                    checked={additionalActivities.includes(a.id)}
+                    onChange={(e) =>
+                      setAdditionalActivities(
+                        e.target.checked
+                          ? [...additionalActivities, a.id]
+                          : additionalActivities.filter((id) => id !== a.id)
+                      )
+                    }
+                  />
+                  {a.label}
+                </label>
+              ))}
+            </fieldset>
+            <label className={field}>
+              Nombre del profesional
+              <Input
+                value={professionalLabel}
+                onChange={(e) => setProfessionalLabel(e.target.value)}
+                maxLength={40}
+                placeholder="Barbero, estilista, técnico…"
+              />
+            </label>
+            <label className={field}>
+              Zona horaria
+              <Input
+                value={timezone}
+                onChange={(e) => setTimezone(e.target.value)}
+                placeholder="America/Santo_Domingo"
+              />
+            </label>
+            <p className="text-muted-foreground text-sm">
+              Módulos incluidos en CRM:{' '}
+              {Object.entries(
+                activityModules(primaryActivity, additionalActivities)
+              )
+                .filter(([, enabled]) => enabled)
+                .map(
+                  ([key]) =>
+                    ({
+                      professionals: 'profesionales',
+                      services: 'servicios',
+                      appointments: 'agenda',
+                      products: 'venta de productos',
+                      inventory: 'inventario',
+                      sales: 'operaciones',
+                      finance: 'finanzas',
+                      commissions: 'comisiones',
+                    })[key]
+                )
+                .join(', ')}
+              .
+            </p>
           </div>
         )}
         {step === 1 && (
@@ -337,6 +433,15 @@ export function CreateBusinessDialog({
             </p>
             <p>Plan solicitado: {plans.find((p) => p.key === plan)?.title}</p>
             <p>
+              Actividades:{' '}
+              {[primaryActivity, ...additionalActivities]
+                .map((id) => ACTIVITIES.find((a) => a.id === id)?.label)
+                .join(' + ')}
+            </p>
+            <p>
+              {professionalLabel} · {timezone}
+            </p>
+            <p>
               Objetivo:{' '}
               {OBJECTIVES.find((goal) => goal.id === objective)?.label}
             </p>
@@ -381,7 +486,11 @@ export function CreateBusinessDialog({
           {step < 4 ? (
             <Button
               disabled={
-                (step === 0 && (!name.trim() || !industry.trim())) ||
+                (step === 0 &&
+                  (!name.trim() ||
+                    !industry.trim() ||
+                    !professionalLabel.trim() ||
+                    !timezone.trim())) ||
                 (step === 2 && !validStageNames(stages, templateId))
               }
               onClick={() => setStep(step + 1)}

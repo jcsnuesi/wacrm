@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { getCurrentAccount, toErrorResponse } from '@/lib/auth/account';
 import { getMediaUrl, downloadMedia } from '@/lib/whatsapp/meta-api';
 import { decrypt } from '@/lib/whatsapp/encryption';
 
@@ -17,33 +17,7 @@ export async function GET(
       );
     }
 
-    const supabase = await createClient();
-
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    // Resolve the caller's account_id — whatsapp_config is one-per-
-    // account post-multi-user, so a teammate fetching media for a
-    // conversation in the shared inbox needs the account's config,
-    // not their personal (non-existent) row.
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('account_id')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    const accountId = profile?.account_id as string | undefined;
-    if (!accountId) {
-      return NextResponse.json(
-        { error: 'Your profile is not linked to an account.' },
-        { status: 403 }
-      );
-    }
+    const { supabase, accountId } = await getCurrentAccount();
 
     // Resolve the line from the message that owns this media. Using the
     // currently active line would break historical media after an account
@@ -96,14 +70,11 @@ export async function GET(
       headers: {
         'Content-Type':
           contentType || mediaInfo.mimeType || 'application/octet-stream',
-        'Cache-Control': 'public, max-age=86400',
+        'Cache-Control': 'private, no-store',
       },
     });
   } catch (error) {
     console.error('Error in WhatsApp media GET:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch media' },
-      { status: 500 }
-    );
+    return toErrorResponse(error);
   }
 }

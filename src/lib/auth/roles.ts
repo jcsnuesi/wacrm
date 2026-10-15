@@ -15,14 +15,16 @@
 // changes a one-file diff.
 // ============================================================
 
-export type AccountRole = "owner" | "admin" | "agent" | "viewer";
+export type AccountRole =
+  'owner' | 'admin' | 'agent' | 'viewer' | 'professional';
 
 /** Ordered list of every valid role, lowest privilege first. */
 export const ACCOUNT_ROLES: readonly AccountRole[] = [
-  "viewer",
-  "agent",
-  "admin",
-  "owner",
+  'professional',
+  'viewer',
+  'agent',
+  'admin',
+  'owner',
 ] as const;
 
 /**
@@ -31,13 +33,15 @@ export const ACCOUNT_ROLES: readonly AccountRole[] = [
  */
 export function roleRank(role: AccountRole): number {
   switch (role) {
-    case "owner":
+    case 'professional':
+      return 0;
+    case 'owner':
       return 4;
-    case "admin":
+    case 'admin':
       return 3;
-    case "agent":
+    case 'agent':
       return 2;
-    case "viewer":
+    case 'viewer':
       return 1;
   }
 }
@@ -53,7 +57,7 @@ export function hasMinRole(role: AccountRole, min: AccountRole): boolean {
 /** Type-narrow an unknown string into a valid `AccountRole`. */
 export function isAccountRole(value: unknown): value is AccountRole {
   return (
-    typeof value === "string" &&
+    typeof value === 'string' &&
     (ACCOUNT_ROLES as readonly string[]).includes(value)
   );
 }
@@ -68,7 +72,7 @@ export function isAccountRole(value: unknown): value is AccountRole {
 
 /** Owner / admin: invite, remove, change roles. */
 export function canManageMembers(role: AccountRole): boolean {
-  return hasMinRole(role, "admin");
+  return hasMinRole(role, 'admin');
 }
 
 /**
@@ -77,7 +81,7 @@ export function canManageMembers(role: AccountRole): boolean {
  * name). Excludes per-user settings like avatar or own password.
  */
 export function canEditSettings(role: AccountRole): boolean {
-  return hasMinRole(role, "admin");
+  return hasMinRole(role, 'admin');
 }
 
 /**
@@ -86,7 +90,7 @@ export function canEditSettings(role: AccountRole): boolean {
  * Viewers are read-only.
  */
 export function canSendMessages(role: AccountRole): boolean {
-  return hasMinRole(role, "agent");
+  return hasMinRole(role, 'agent');
 }
 
 /**
@@ -95,15 +99,15 @@ export function canSendMessages(role: AccountRole): boolean {
  * shows the "Read-only" tooltip without inverting `canSendMessages`).
  */
 export function canViewOnly(role: AccountRole): boolean {
-  return role === "viewer";
+  return role === 'viewer';
 }
 
 /** Owner only: irreversible destructive operations. */
 export function canDeleteAccount(role: AccountRole): boolean {
-  return role === "owner";
+  return role === 'owner';
 }
 
 /** Owner only: hand the account to another member. */
 export function canTransferOwnership(role: AccountRole): boolean {
-  return role === "owner";
+  return role === 'owner';
 }

@@ -95,6 +95,15 @@ afterEach(() => {
 });
 
 describe('getCurrentAccount', () => {
+  it('limits professional memberships to explicitly scoped operations callers', async () => {
+    const { client } = makeClient({ user: { id: 'user-prof' }, byTable: {
+      profiles: { data: { account_id: 'acct-prof', account_role: 'professional' }, error: null },
+      accounts: { data: { id: 'acct-prof', name: 'Work', default_currency: 'USD' }, error: null },
+    }});
+    createClient.mockReturnValue(client);
+    await expect(getCurrentAccount()).rejects.toBeInstanceOf(ForbiddenError);
+    expect((await getCurrentAccount({ allowProfessional: true })).role).toBe('professional');
+  });
   it('resolves context via a plain accounts lookup, not an embedded join', async () => {
     const { client, calls } = makeClient({
       user: { id: 'user-1' },

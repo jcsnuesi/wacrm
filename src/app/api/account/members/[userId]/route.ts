@@ -71,6 +71,7 @@ export async function PATCH(
 
     // The RPC blocks promotion to / demotion from owner, but
     // surface the friendlier 400 before crossing the wire too.
+    if (role === "professional") return NextResponse.json({error:'Vincula el acceso profesional desde Operación.'},{status:400});
     if (role === "owner") {
       return NextResponse.json(
         {

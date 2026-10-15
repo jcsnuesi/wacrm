@@ -11,6 +11,7 @@ const PROTECTED_PAGE_PATHS = [
   '/flows',
   '/inbox',
   '/notifications',
+  '/operations',
   '/pipelines',
   '/plan',
   '/settings',
@@ -34,7 +35,7 @@ export async function proxy(request: NextRequest) {
   // is slow or unavailable. Their route handlers verify provider-specific
   // HMAC signatures before accepting a payload, so skip browser-session
   // resolution entirely for this narrow public surface.
-  if (isPublicWhatsappWebhookPath(request.nextUrl.pathname)) {
+  if (isPublicWhatsappWebhookPath(request.nextUrl.pathname) || request.nextUrl.pathname.startsWith('/book/') || request.nextUrl.pathname.startsWith('/api/booking/')) {
     return NextResponse.next();
   }
 

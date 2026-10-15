@@ -183,7 +183,7 @@ export async function POST(request: Request) {
       | null;
 
     const role = body?.role;
-    if (!isAccountRole(role) || role === "owner") {
+    if (!isAccountRole(role) || role === "owner" || role === "professional") {
       // The DB CHECK already rejects 'owner', but failing fast
       // here gives a clearer 400 than the eventual constraint
       // violation surfaced as a 500.

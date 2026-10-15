@@ -67,6 +67,8 @@
     "unreadConversations": "{count} unread {count, plural, =1 {conversation} other {conversations}}",
     "unreadNotifications": "{count} unread {count, plural, =1 {notification} other {notifications}}",
     "roleOwner": "Owner",
+    "roleProfessional": "Professional",
+    "operations": "Operations",
     "roleAdmin": "Admin",
     "roleAgent": "Agent",
     "roleViewer": "Viewer",
@@ -78,6 +80,7 @@
     "menuSignOut": "Sign out"
   },
   "Header": {
+    "operations": "Operations",
     "businessPlan": "Business plan",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
@@ -1494,6 +1497,8 @@
       "toastUploadFailed": "Upload failed."
     },
     "roles": {
+      "professional": "Professional",
+      "professionalHint": "Own appointments and activity only",
       "admin": "Admin",
       "adminHint": "Manage members + everything",
       "agent": "Agent",

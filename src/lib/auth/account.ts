@@ -109,7 +109,9 @@ export interface AccountContext {
  * Use `requireRole(min)` instead when the route also needs a
  * minimum-role check — it's a thin wrapper over this.
  */
-export async function getCurrentAccount(): Promise<AccountContext> {
+export async function getCurrentAccount(
+  options: { allowProfessional?: boolean } = {}
+): Promise<AccountContext> {
   const supabase = await createClient();
 
   const {
@@ -209,8 +211,18 @@ export async function getCurrentAccount(): Promise<AccountContext> {
             membershipError.message
           );
         } else if (membership && isAccountRole(membership.role)) {
-          accountId = requested;
-          role = membership.role;
+          if (membership.role === 'professional') {
+            const scoped = await supabase.rpc('ops_role', {
+              p_account: requested,
+            });
+            if (!scoped.error && scoped.data === 'professional') {
+              accountId = requested;
+              role = membership.role;
+            }
+          } else {
+            accountId = requested;
+            role = membership.role;
+          }
         }
       }
     } catch (err) {
@@ -247,6 +259,11 @@ export async function getCurrentAccount(): Promise<AccountContext> {
     throw new ForbiddenError('Profile is not linked to an account');
   }
 
+  if (role === 'professional' && !options.allowProfessional) {
+    throw new ForbiddenError(
+      'El acceso de profesional está limitado a su operación.'
+    );
+  }
   return {
     supabase,
     userId: user.id,

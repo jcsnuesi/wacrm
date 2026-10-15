@@ -2,6 +2,8 @@
 
 Rama actual: `plantillas`, creada desde `codex/oaas-community-foundation`. Fecha inicial: 14 de octubre de 2026.
 
+La entrega de actividades, profesionales, agenda, inventario, comprobantes y finanzas se documenta en [Plan de operación por actividades](PLAN_ACTIVIDADES_OPERACION_FINANZAS.md), con ocho fases propias y estado de activación. No implica que las integraciones OaaS siguientes estén terminadas.
+
 ## Fases desplegables
 
 | Fase | Entrega                                                      | Estado                                             |

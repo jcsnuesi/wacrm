@@ -14,7 +14,7 @@ import {
  */
 export async function GET() {
   try {
-    const ctx = await getCurrentAccount();
+    const ctx = await getCurrentAccount({ allowProfessional: true });
     const switchEnabled = isActiveAccountSwitchEnabled();
 
     let availableAccounts: Array<{
@@ -103,7 +103,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const ctx = await getCurrentAccount();
+    const ctx = await getCurrentAccount({ allowProfessional: true });
 
     const body = (await request.json().catch(() => null)) as {
       account_id?: unknown;
@@ -167,7 +167,7 @@ export async function DELETE() {
     }
 
     // Ensure caller is authenticated before mutating session context.
-    await getCurrentAccount();
+    await getCurrentAccount({ allowProfessional: true });
 
     const response = NextResponse.json({ success: true });
     response.cookies.delete(ACTIVE_ACCOUNT_COOKIE);
