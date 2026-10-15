@@ -10,3 +10,5 @@ pnpm-debug.log*
 .env.*
 !.env.local.example
 README.md
+infra/n8n/.secrets
+work

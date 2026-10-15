@@ -28,6 +28,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { CreateBusinessDialog } from './create-business-dialog';
+import { isActiveAccountSwitchEnabled } from '@/lib/auth/active-account';
 import type { AccountRole } from '@/lib/auth/roles';
 
 // Per-role chip metadata used in the sidebar's account strip + the
@@ -105,6 +107,7 @@ const navItems: NavItem[] = [
 ];
 
 const bottomNavItems = [
+  { href: '/plan', labelKey: 'businessPlan', icon: Crown },
   { href: '/settings', labelKey: 'settings', icon: Settings },
 ];
 
@@ -143,6 +146,7 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
   const showAccountStrip =
     !profileLoading && !!account?.name && account.name !== profile?.full_name;
   const canSwitchAccounts = availableAccounts.length > 1;
+  const [createBusinessOpen, setCreateBusinessOpen] = useState(false);
   const [whatsappConfigs, setWhatsappConfigs] = useState<
     Array<{
       id: string;
@@ -559,10 +563,19 @@ export function Sidebar({ open = false, onClose }: SidebarProps) {
                 <LogOut className="size-4" />
                 {t('menuSignOut')}
               </DropdownMenuItem>
+              {isActiveAccountSwitchEnabled() && (
+                <DropdownMenuItem onClick={() => setCreateBusinessOpen(true)}>
+                  Crear negocio
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </aside>
+      <CreateBusinessDialog
+        open={createBusinessOpen}
+        onOpenChange={setCreateBusinessOpen}
+      />
     </>
   );
 }

@@ -1,4 +1,39 @@
 {
+  "BusinessPlan": {
+    "title": "Business plan",
+    "isolated": "Capabilities belong only to this business",
+    "unconfigured": "Plan not configured",
+    "included": "Entitled",
+    "notIncluded": "Not entitled",
+    "plans": {
+      "crm": "CRM",
+      "managed": "Managed automation",
+      "advanced": "Advanced automation"
+    },
+    "statuses": {
+      "active": "Active",
+      "trialing": "Trial",
+      "past_due": "Payment overdue",
+      "suspended": "Suspended",
+      "canceled": "Canceled",
+      "unconfigured": "Setup required"
+    },
+    "features": {
+      "crm": "CRM",
+      "managed_automation": "Workflows managed by our team",
+      "advertising_reporting": "Advertising reporting",
+      "workflow_editor": "Customer workflow editor"
+    },
+    "reasons": {
+      "migration_required": "The business plan database migration has not been applied.",
+      "missing_record": "This business needs a plan record. Contact the operator.",
+      "inactive": "New paid features are unavailable for this subscription status.",
+      "expired": "The access period has ended.",
+      "invalid_record": "Plan configuration could not be verified."
+    },
+    "foundationNotice": "This screen shows entitlements only. Managed workflows and advertising reporting are not yet connected. No checkout, automatic charges or global suspension is enabled. Existing CRM modules keep their current behavior.",
+    "licensingNotice": "Customer workflow editing requires a commercial n8n agreement that covers this use, independently of the business plan."
+  },
   "LoginPage": {
     "titleAccept": "Sign in to accept",
     "titleWelcome": "Welcome back",
@@ -15,6 +50,7 @@
     "createAccount": "Create account"
   },
   "Sidebar": {
+    "businessPlan": "Business plan",
     "title": "Align Mktg",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
@@ -42,6 +78,7 @@
     "menuSignOut": "Sign out"
   },
   "Header": {
+    "businessPlan": "Business plan",
     "dashboard": "Dashboard",
     "inbox": "Inbox",
     "notifications": "Notifications",

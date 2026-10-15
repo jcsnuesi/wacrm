@@ -3,6 +3,9 @@
 # dependencies
 /docs
 /node_modules
+
+# Local screenshots, browser reports and temporary test artifacts
+/work/
 /.pnp
 .pnp.*
 .yarn/*

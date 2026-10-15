@@ -12,6 +12,7 @@ const PROTECTED_PAGE_PATHS = [
   '/inbox',
   '/notifications',
   '/pipelines',
+  '/plan',
   '/settings',
 ];
 
@@ -118,10 +119,7 @@ export async function proxy(request: NextRequest) {
   }
 
   // API routes that need auth (webhooks returned above)
-  if (
-    !user &&
-    request.nextUrl.pathname.startsWith('/api/whatsapp/')
-  ) {
+  if (!user && request.nextUrl.pathname.startsWith('/api/whatsapp/')) {
     return withRefreshedCookies(
       NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     );

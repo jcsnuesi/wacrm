@@ -1,4 +1,39 @@
 {
+  "BusinessPlan": {
+    "title": "비즈니스 플랜",
+    "isolated": "이 비즈니스에만 적용되는 기능",
+    "unconfigured": "플랜 미설정",
+    "included": "사용 권한 있음",
+    "notIncluded": "사용 권한 없음",
+    "plans": {
+      "crm": "CRM",
+      "managed": "관리형 자동화",
+      "advanced": "고급 자동화"
+    },
+    "statuses": {
+      "active": "활성",
+      "trialing": "체험",
+      "past_due": "결제 연체",
+      "suspended": "일시 중지",
+      "canceled": "취소",
+      "unconfigured": "설정 필요"
+    },
+    "features": {
+      "crm": "CRM",
+      "managed_automation": "운영팀 관리 워크플로",
+      "advertising_reporting": "광고 보고서",
+      "workflow_editor": "고객 워크플로 편집기"
+    },
+    "reasons": {
+      "migration_required": "비즈니스 플랜 데이터베이스 마이그레이션이 필요합니다.",
+      "missing_record": "플랜 정보가 필요합니다. 운영자에게 문의하세요.",
+      "inactive": "현재 구독 상태에서는 새로운 유료 기능을 사용할 수 없습니다.",
+      "expired": "접근 기간이 종료되었습니다.",
+      "invalid_record": "플랜 설정을 확인할 수 없습니다."
+    },
+    "foundationNotice": "이 화면은 사용 권한만 표시합니다. 관리형 워크플로와 광고 보고서는 아직 연결되지 않았습니다. 자동 결제 및 전체 서비스 중지는 활성화되지 않았으며 기존 CRM 기능은 유지됩니다.",
+    "licensingNotice": "고객 워크플로 편집에는 비즈니스 플랜과 별도로 해당 사용을 허용하는 n8n 상업 계약이 필요합니다."
+  },
   "LoginPage": {
     "titleAccept": "로그인하여 수락하기",
     "titleWelcome": "다시 오신 것을 환영합니다",
@@ -15,6 +50,7 @@
     "createAccount": "계정 만들기"
   },
   "Sidebar": {
+    "businessPlan": "비즈니스 플랜",
     "title": "Align Mktg",
     "dashboard": "대시보드",
     "inbox": "인박스",
@@ -42,6 +78,7 @@
     "menuSignOut": "로그아웃"
   },
   "Header": {
+    "businessPlan": "비즈니스 플랜",
     "dashboard": "대시보드",
     "inbox": "인박스",
     "notifications": "알림",

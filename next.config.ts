@@ -64,7 +64,7 @@ const SECURITY_HEADERS = [
 ] as const;
 
 const PRIVATE_PAGE_PATTERN =
-  'agents(?:/|$)|automations(?:/|$)|broadcasts(?:/|$)|contacts(?:/|$)|customers(?:/|$)|dashboard(?:/|$)|flows(?:/|$)|inbox(?:/|$)|notifications(?:/|$)|pipelines(?:/|$)|settings(?:/|$)';
+  'agents(?:/|$)|automations(?:/|$)|broadcasts(?:/|$)|contacts(?:/|$)|customers(?:/|$)|dashboard(?:/|$)|flows(?:/|$)|inbox(?:/|$)|notifications(?:/|$)|pipelines(?:/|$)|plan(?:/|$)|settings(?:/|$)';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -115,16 +115,16 @@ const nextConfig: NextConfig = {
    *     the correct production headers for hashed assets.
    *   - /api/*          — no-store. API responses are per-user and
    *     must never be shared across requests at the edge.
-    *   - Authenticated app pages — private, no-store. These must never
-    *     be shared by a CDN, even if a host tries to cache HTML.
-    *   - Everything public — brief s-maxage + generous
+   *   - Authenticated app pages — private, no-store. These must never
+   *     be shared by a CDN, even if a host tries to cache HTML.
+   *   - Everything public — brief s-maxage + generous
    *     stale-while-revalidate. The edge serves instantly from cache
    *     for the first 5 min, then returns cached content while
    *     refreshing in the background for up to 24 h. A deploy's
    *     chunk-hash drift self-heals within ~5 min with no user-
    *     visible latency.
    *
-    * Security headers are appended via a separate catch-all rule
+   * Security headers are appended via a separate catch-all rule
    * below — Next.js merges headers from every matching rule, so
    * they apply to every response regardless of which cache rule
    * matched.

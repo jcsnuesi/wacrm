@@ -1,0 +1,93 @@
+# Local operator-only Community pilot; not an external customer editor.
+name: wacrm-n8n-pilot
+services:
+  postgres:
+    image: postgres:18
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: n8n
+      POSTGRES_USER: n8n
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_password
+      PGDATA: /var/lib/postgresql/data
+    secrets:
+      - database_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - automation
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U n8n -d n8n]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    cpus: 0.5
+    mem_limit: 512m
+    security_opt:
+      - no-new-privileges:true
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:2.43.5
+    restart: unless-stopped
+    user: '1000:1000'
+    ports:
+      - '127.0.0.1:5678:5678'
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD_FILE: /run/secrets/database_password
+      N8N_ENCRYPTION_KEY_FILE: /run/secrets/encryption_key
+      N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS: 'true'
+      N8N_SECURE_COOKIE: 'false'
+      N8N_EDITOR_BASE_URL: http://localhost:5678
+      N8N_WEBHOOK_URL: http://localhost:5678/
+      N8N_UNVERIFIED_PACKAGES_ENABLED: 'false'
+      N8N_RUNNERS_MODE: external
+      N8N_RUNNERS_AUTH_TOKEN_FILE: /run/secrets/runner_token
+      TZ: America/Santo_Domingo
+      GENERIC_TIMEZONE: America/Santo_Domingo
+      N8N_DIAGNOSTICS_ENABLED: 'false'
+      EXECUTIONS_DATA_PRUNE: 'true'
+      EXECUTIONS_DATA_MAX_AGE: '168'
+      NODES_EXCLUDE: '["n8n-nodes-base.executeCommand","n8n-nodes-base.readWriteFile","n8n-nodes-base.code"]'
+    secrets:
+      - database_password
+      - encryption_key
+      - runner_token
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - automation
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:5678/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    cpus: 1
+    mem_limit: 1536m
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  automation:
+volumes:
+  postgres_data:
+  n8n_data:
+secrets:
+  database_password:
+    file: .secrets/database-password
+  encryption_key:
+    file: .secrets/encryption-key
+  runner_token:
+    file: .secrets/runner-token
