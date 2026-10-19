@@ -1,0 +1,17 @@
+{
+  "capturedAt": "2026-10-15T00:38:59.528Z",
+  "screenshots": [
+    "16-real-create-business-selector.png",
+    "17-real-create-business-details.png",
+    "18-real-create-business-plan.png",
+    "19-real-create-business-review.png",
+    "20-real-create-business-setup-pending.png"
+  ],
+  "errors": [],
+  "created": false,
+  "status": 503,
+  "result": {
+    "error": "El alta de negocios necesita activar la migración 057 en Supabase.",
+    "code": "migration_required"
+  }
+}

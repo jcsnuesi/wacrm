@@ -1,0 +1,15 @@
+{
+  "provenance": "UI real de Next.js; sesión de prueba real; GET /api/operations sustituido por resultado de PostgreSQL local aislado. No prueba de integración con Supabase remoto ni almacenamiento.",
+  "screenshots": [
+    "27-operations-local-summary.png",
+    "28-operations-local-agenda.png",
+    "29-operations-local-professionals.png",
+    "30-operations-local-inventory.png",
+    "31-operations-local-sales.png",
+    "32-operations-local-proofs.png",
+    "33-operations-local-finance.png",
+    "34-operations-local-mobile.png"
+  ],
+  "errors": [],
+  "mutations": 0
+}

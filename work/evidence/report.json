@@ -1,0 +1,57 @@
+{
+  "capturedAt": "2026-10-15T00:13:25.603Z",
+  "checks": [
+    {
+      "name": "Real WACRM /plan requires authentication",
+      "passed": true,
+      "url": "http://localhost:3100/login",
+      "renderedText": "Welcome back\nSign in to your account\nEmail\nPassword\nForgot password?\nSign in\n\nDon't have an account? Create account"
+    },
+    {
+      "name": "Real business plan API rejects anonymous access",
+      "passed": true,
+      "status": 401
+    },
+    {
+      "name": "Real n8n database readiness",
+      "passed": true,
+      "status": 200
+    },
+    {
+      "name": "Real n8n UI loaded; owner setup may be pending",
+      "url": "http://localhost:5678/",
+      "renderedText": "Set up owner account\nEmail *\nFirst Name *\nLast Name *\nPassword *\n8+ characters, at least 1 number and 1 capital letter\nI want to receive security and product updates\nNext"
+    },
+    {
+      "name": "Prototype only: switching business changes paid capabilities",
+      "passed": true
+    },
+    {
+      "name": "Prototype only: new business has no inherited connections",
+      "passed": true
+    },
+    {
+      "name": "Prototype only: suspension confirmation changes local state",
+      "passed": true
+    },
+    {
+      "name": "Prototype mobile has no horizontal overflow",
+      "passed": true
+    }
+  ],
+  "screenshots": [
+    "01-wacrm-auth-required.png",
+    "02-n8n-real-ui.png",
+    "03-prototype-advertising.png",
+    "04-prototype-isolated-business.png",
+    "05-prototype-onboarding.png",
+    "06-prototype-admin.png",
+    "07-prototype-mobile.png"
+  ],
+  "pageErrors": [],
+  "limitations": [
+    "The authenticated real /plan screen cannot be verified without a user session.",
+    "Screenshots 03–07 are the design prototype with fictitious data, not the implemented CRM.",
+    "No user was created, no credentials submitted, no Supabase migration applied, no real billing/suspension/notification occurred."
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "capturedAt": "2026-10-15T00:21:55.155Z",
+  "testEmail": "wacrm-evidence-1792023453042@example.com",
+  "checks": [
+    {
+      "name": "Real test user signs in",
+      "passed": true
+    },
+    {
+      "name": "Real authenticated plan API",
+      "passed": true,
+      "status": 200,
+      "data": {
+        "account_id": "273af064-7ccc-46c4-8fcf-d1c7f88f5b27",
+        "plan_key": null,
+        "status": "unconfigured",
+        "reason": "migration_required",
+        "access_until": null,
+        "features": {
+          "crm": false,
+          "managed_automation": false,
+          "advertising_reporting": false,
+          "workflow_editor": false
+        }
+      }
+    },
+    {
+      "name": "n8n readiness",
+      "passed": true,
+      "status": 200
+    }
+  ],
+  "screenshots": [
+    "08-real-test-account-dashboard.png",
+    "09-real-business-plan.png",
+    "10-real-business-plan-api.png",
+    "11-real-business-plan-mobile.png",
+    "12-real-n8n-owner-onboarding.png"
+  ],
+  "errors": [],
+  "limitations": [
+    "Subscription migration 056 is absent in configured Supabase; /plan shows migration required with paid features disabled.",
+    "No CRM-to-n8n workflows, advertising connector, checkout or global administration have been implemented yet.",
+    "All screenshots in this report are real services; no design prototype is used."
+  ]
+}

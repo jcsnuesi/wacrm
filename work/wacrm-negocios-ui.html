@@ -1,0 +1,111 @@
+<div id="wacrm-business-preview">
+  <style>
+    #wacrm-business-preview{--wa-bg:light-dark(#f7f8fb,#14151a);--wa-panel:light-dark(#ffffff,#1c1d24);--wa-text:light-dark(#212331,#ececf3);--wa-sub:light-dark(#606579,#b1b4c4);--wa-line:light-dark(#e3e5ee,#343640);--wa-accent:light-dark(#6553c7,#b8a7ff);--wa-soft:light-dark(#efebff,#302847);color:var(--wa-text);font:14px/1.5 system-ui,sans-serif;background:var(--wa-bg);border:1px solid var(--wa-line);border-radius:14px;overflow:hidden;color-scheme:light dark}
+    #wacrm-business-preview *{box-sizing:border-box}
+    #wacrm-business-preview button,#wacrm-business-preview select,#wacrm-business-preview input{font:inherit;color:inherit}
+    #wacrm-business-preview button{background:var(--wa-panel);border:1px solid var(--wa-line);border-radius:8px;padding:9px 13px;text-align:left}
+    #wacrm-business-preview button:disabled{opacity:.55;cursor:not-allowed}
+    #wacrm-business-preview select,#wacrm-business-preview input{background:var(--wa-panel);border:1px solid var(--wa-line);border-radius:8px;padding:10px;width:100%;min-width:0}
+    #wacrm-business-preview .wa-top{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px 22px;background:var(--wa-panel);border-bottom:1px solid var(--wa-line);flex-wrap:wrap;padding-right:105px}
+    #wacrm-business-preview .wa-brand{font-size:19px;font-weight:650;letter-spacing:-.6px}
+    #wacrm-business-preview .wa-muted{color:var(--wa-sub)}
+    #wacrm-business-preview .wa-demo{font-size:12px;color:var(--wa-sub)}
+    #wacrm-business-preview .wa-shell{display:grid;grid-template-columns:205px minmax(0,1fr)}
+    #wacrm-business-preview .wa-side{background:var(--wa-panel);padding:20px 14px;border-right:1px solid var(--wa-line)}
+    #wacrm-business-preview .wa-side label{display:block;font-size:12px;margin-bottom:6px;color:var(--wa-sub)}
+    #wacrm-business-preview .wa-side .wa-add{width:100%;margin:10px 0 24px;color:var(--wa-accent)}
+    #wacrm-business-preview .wa-nav{display:grid;gap:5px}
+    #wacrm-business-preview .wa-nav button{border-color:transparent;background:transparent}
+    #wacrm-business-preview .wa-nav button[aria-pressed=true]{background:var(--wa-soft);color:var(--wa-accent)}
+    #wacrm-business-preview .wa-session{margin-top:32px;padding-top:15px;border-top:1px solid var(--wa-line);font-size:12px;overflow-wrap:anywhere}
+    #wacrm-business-preview .wa-main{padding:25px;min-width:0}
+    #wacrm-business-preview h2{font-size:25px;line-height:1.2;margin:6px 0 8px;font-weight:600;letter-spacing:-.7px}
+    #wacrm-business-preview h3{font-size:16px;margin:0 0 12px;font-weight:600}
+    #wacrm-business-preview p{margin:0 0 16px}
+    #wacrm-business-preview .wa-tag{display:inline-block;font-size:12px;padding:4px 8px;border-radius:5px;background:var(--wa-soft);color:var(--wa-accent)}
+    #wacrm-business-preview .wa-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}
+    #wacrm-business-preview .wa-box{padding:17px;background:var(--wa-panel);border:1px solid var(--wa-line);border-radius:10px;min-width:0}
+    #wacrm-business-preview .wa-value{font-size:24px;font-weight:600;letter-spacing:-.5px;margin:6px 0}
+    #wacrm-business-preview .wa-row{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;padding:12px 0;border-bottom:1px solid var(--wa-line)}
+    #wacrm-business-preview .wa-row:last-child{border:0}
+    #wacrm-business-preview .wa-primary{background:var(--wa-accent);color:light-dark(#fff,#171124);border-color:var(--wa-accent)}
+    #wacrm-business-preview .wa-controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}
+    #wacrm-business-preview .wa-steps{display:flex;gap:10px;flex-wrap:wrap;font-size:12px;color:var(--wa-sub);margin:18px 0}
+    #wacrm-business-preview .wa-steps strong{color:var(--wa-accent)}
+    #wacrm-business-preview .wa-choice{width:100%;margin:6px 0}
+    #wacrm-business-preview .wa-choice[aria-pressed=true]{border-color:var(--wa-accent);background:var(--wa-soft)}
+    #wacrm-business-preview .wa-form label{display:block;margin:14px 0 5px}
+    #wacrm-business-preview .wa-error{color:light-dark(#b52b3a,#ffb4bd);margin-top:10px}
+    @media(max-width:640px){#wacrm-business-preview .wa-shell{grid-template-columns:1fr}#wacrm-business-preview .wa-side{border-right:0;border-bottom:1px solid var(--wa-line)}#wacrm-business-preview .wa-nav{display:flex;flex-wrap:wrap}#wacrm-business-preview .wa-side .wa-add{margin-bottom:12px}#wacrm-business-preview .wa-session{margin-top:14px;padding-top:10px}#wacrm-business-preview .wa-main{padding:18px}#wacrm-business-preview .wa-grid{grid-template-columns:1fr}#wacrm-business-preview .wa-top{padding:15px 95px 15px 16px}}
+  </style>
+  <header class="wa-top"><div class="wa-brand">WACRM</div><button type="button" class="cursor-interaction" id="wa-platform">Administración de plataforma</button><span class="wa-demo">Maqueta · Datos ficticios · Sin cobros</span></header>
+  <div class="wa-shell">
+    <aside class="wa-side">
+      <label for="wa-business">Negocio activo</label>
+      <select id="wa-business" aria-label="Cambiar negocio"><option value="tienda">Repuestos Norte</option><option value="academia">Academia Horizonte</option></select>
+      <button class="wa-add cursor-interaction" id="wa-create" type="button">＋ Crear otro negocio</button>
+      <nav class="wa-nav" aria-label="Secciones del negocio">
+        <button class="cursor-interaction" data-page="resumen" aria-pressed="true" type="button">Resumen</button>
+        <button class="cursor-interaction" data-page="publicidad" aria-pressed="false" type="button">Publicidad</button>
+        <button class="cursor-interaction" data-page="conexiones" aria-pressed="false" type="button">Conexiones</button>
+        <button class="cursor-interaction" data-page="plan" aria-pressed="false" type="button">Plan y consumo</button>
+      </nav>
+      <div class="wa-session"><strong>Tu cuenta de acceso</strong><div class="wa-muted">usuario@ejemplo.com</div></div>
+    </aside>
+    <main class="wa-main" id="wa-screen" aria-live="polite"></main>
+  </div>
+  <script>
+  (()=>{
+    const root=document.getElementById('wacrm-business-preview');
+    const screen=root.querySelector('#wa-screen'),picker=root.querySelector('#wa-business');
+    const businesses={
+      tienda:{name:'Repuestos Norte',plan:'CRM + Publicidad',ads:true,role:'Propietario',leads:120,sales:20,revenue:80000,spend:20000,account:'Meta Ads · Repuestos Norte · 4821',channel:'WhatsApp · Repuestos Norte',runs:154,limit:1000},
+      academia:{name:'Academia Horizonte',plan:'CRM + OaaS',ads:false,role:'Propietario',leads:48,sales:12,revenue:36000,spend:null,account:null,channel:'WhatsApp · Academia Horizonte',runs:86,limit:500}
+    };
+    let selected='tienda',page='resumen',step=0,platform=false,draft={name:'',sector:'',plan:'CRM'};
+    const money=n=>'RD$ '+n.toLocaleString('es-DO');
+    const escape=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    function card(label,value,detail){return `<div class="wa-box"><div class="wa-muted">${label}</div><div class="wa-value">${value}</div><span class="wa-muted">${detail}</span></div>`}
+    function render(){
+      if(platform){renderAdmin();return;}
+      const b=businesses[selected];
+      root.querySelectorAll('[data-page]').forEach(x=>x.setAttribute('aria-pressed',String(x.dataset.page===page)));
+      let head=`<span class="wa-tag">${escape(b.plan)} · ${b.role}</span><h2>${escape(b.name)}</h2>`;
+      if(page==='resumen')screen.innerHTML=head+`<p class="wa-muted">Resultados de este negocio · Últimos 30 días</p><div class="wa-grid">${card('Contactos nuevos',b.leads,'Personas, no mensajes')}${card('Ventas verificadas',b.sales,'Con evidencia de pago')}${card('Ingresos cobrados',money(b.revenue),'Datos de demostración')}</div><div class="wa-box"><h3>Tu operación</h3><div class="wa-row"><span>Proceso activo</span><strong>Recuperación de oportunidades</strong></div><div class="wa-row"><span>Conversaciones que necesitan atención</span><strong>${selected==='tienda'?7:3}</strong></div><div class="wa-row"><span>Conexión de atención</span><span>${escape(b.channel)}</span></div></div>`;
+      if(page==='publicidad'){
+        if(b.ads&&!b.account){screen.innerHTML=head+`<p class="wa-muted">Publicidad de este negocio</p><div class="wa-box"><h3>Sin cuenta publicitaria conectada</h3><p>Conecta una cuenta propia para comenzar a medir inversión y resultados.</p><span class="wa-tag">${escape(b.name)}</span></div>`;return;}
+        if(!b.ads){screen.innerHTML=head+`<p class="wa-muted">Publicidad de ${escape(b.name)}</p><div class="wa-box"><h3>Activa Publicidad para este negocio</h3><p>Tu plan CRM + OaaS no incluye este módulo. Al activarlo podrás conectar las cuentas publicitarias de Academia Horizonte.</p><button class="wa-primary cursor-interaction" id="wa-view-plan" type="button">Ver plan de este negocio</button></div>`;screen.querySelector('#wa-view-plan').onclick=()=>{page='plan';render()};return;}
+        screen.innerHTML=head+`<p class="wa-muted">${escape(b.account)} · Últimos 30 días</p><div class="wa-grid">${card('Inversión publicitaria',money(b.spend),'Meta Ads · Repuestos Norte')}${card('ROAS verificado','4,0x','Ingresos / inversión')}${card('Costo por cliente nuevo',money(b.spend/b.sales),'20 primeras compras verificadas')}</div><div class="wa-box"><h3>Del anuncio a la venta</h3><div class="wa-row"><span>Campaña</span><strong>Repuestos · Consultas WhatsApp</strong></div><div class="wa-row"><span>Contactos atribuidos</span><strong>120</strong></div><div class="wa-row"><span>Clientes nuevos con compra</span><strong>20</strong></div><div class="wa-row"><span>Ingresos atribuidos cobrados</span><strong>${money(b.revenue)}</strong></div><div class="wa-row"><span>Rentabilidad después de costos</span><span>Faltan costos del negocio</span></div></div>`;
+      }
+      if(page==='conexiones')screen.innerHTML=head+`<p class="wa-muted">Conexiones de este negocio</p><div class="wa-box"><h3>Canales y sistemas</h3><div class="wa-row"><span>${escape(b.channel)}</span><span class="wa-tag">Conectado</span></div><div class="wa-row"><span>Sistema de pagos · ${escape(b.name)}</span><span class="wa-tag">Conectado</span></div><div class="wa-row"><span>${b.account?escape(b.account):'Cuenta publicitaria'}</span><span>${b.account?'Conectada':'Sin cuenta vinculada'}</span></div></div>`;
+      if(page==='plan')screen.innerHTML=head+`<p class="wa-muted">Suscripción y consumo de este negocio</p><div class="wa-box"><h3>${escape(b.plan)}</h3><div class="wa-row"><span>Estado de suscripción</span><span class="wa-tag">Activa · Ejemplo</span></div><div class="wa-row"><span>Publicidad</span><strong>${b.ads?'Incluida':'No incluida'}</strong></div><div class="wa-row"><span>Operación OaaS</span><strong>${b.ads?'No incluida':'Incluida'}</strong></div><div class="wa-row"><span>Ejecuciones del mes</span><strong>${b.runs} / ${b.limit}</strong></div><div class="wa-row"><span>Cuentas publicitarias conectadas</span><strong>${b.account?1:0}</strong></div></div>`;
+    }
+    function renderAdmin(){
+      screen.innerHTML=`<span class="wa-tag">Administrador de plataforma · Demostración</span><h2>Negocios y suscripciones</h2><p class="wa-muted">Acceso administrativo con acciones auditadas</p><div class="wa-box"><h3>Negocios registrados</h3>${Object.entries(businesses).map(([id,b])=>`<div class="wa-row"><div><strong>${escape(b.name)}</strong><div class="wa-muted">${escape(b.plan)} · ${b.runs}/${b.limit} ejecuciones</div></div><div><span class="wa-tag">${b.suspended?'Suspendido':'Activo'}</span> <button type="button" class="cursor-interaction" data-suspend="${id}">${b.suspended?'Restablecer':'Revisar suspensión'}</button></div></div>`).join('')}</div><div class="wa-box wa-form" style="margin-top:16px"><h3>Avisos técnicos</h3><label for="wa-notice-target">Destinatarios</label><select id="wa-notice-target"><option>Todos los negocios</option>${Object.values(businesses).map(b=>`<option>${escape(b.name)}</option>`).join('')}</select><label for="wa-notice-text">Mensaje</label><input id="wa-notice-text" placeholder="Ej. Mantenimiento programado: fecha y horario" maxlength="200"><div class="wa-controls"><button type="button" id="wa-notice-save" class="cursor-interaction">Guardar borrador de demostración</button></div><div id="wa-admin-status" role="status" class="wa-muted"></div></div>`;
+      screen.querySelectorAll('[data-suspend]').forEach(x=>x.onclick=()=>{
+        const b=businesses[x.dataset.suspend];
+        if(b.suspended){b.suspended=false;renderAdmin();return;}
+        const box=document.createElement('div');box.className='wa-box wa-form';box.style.marginTop='16px';
+        box.innerHTML=`<h3>Suspender ${escape(b.name)}</h3><p>Se bloquearían nuevas acciones de pago. Los datos se conservan. La publicidad externa continúa.</p><label for="wa-reason">Motivo de suspensión</label><input id="wa-reason" placeholder="Ej. Factura vencida tras período de gracia"><div role="alert" id="wa-reason-error" class="wa-error"></div><div class="wa-controls"><button type="button" class="wa-primary cursor-interaction" id="wa-confirm-suspend">Confirmar simulación</button><button type="button" class="cursor-interaction" id="wa-abort-suspend">Cancelar</button></div>`;
+        screen.prepend(box);box.querySelector('#wa-abort-suspend').onclick=()=>renderAdmin();box.querySelector('#wa-confirm-suspend').onclick=()=>{if(!box.querySelector('#wa-reason').value.trim()){box.querySelector('#wa-reason-error').textContent='Indica el motivo.';return;}b.suspended=true;renderAdmin()};
+      });
+      screen.querySelector('#wa-notice-save').onclick=()=>{screen.querySelector('#wa-admin-status').textContent=screen.querySelector('#wa-notice-text').value.trim()?'Borrador local guardado. No se envió ninguna notificación.':'Escribe el mensaje del aviso.'};
+    }
+    function wizard(){
+      root.querySelectorAll('[data-page]').forEach(x=>x.setAttribute('aria-pressed','false'));
+      const labels=['Negocio','Plan','Revisar'];
+      screen.innerHTML=`<span class="wa-tag">Alta de negocio</span><h2>Crea un espacio independiente</h2><div class="wa-steps">${labels.map((s,i)=>i===step?`<strong>${i+1}. ${s}</strong>`:`<span>${i+1}. ${s}</span>`).join('')}</div><div class="wa-box wa-form" id="wa-form"></div>`;
+      const form=screen.querySelector('#wa-form');
+      if(step===0){form.innerHTML=`<label for="wa-name">Nombre del negocio</label><input id="wa-name" value="${escape(draft.name)}" placeholder="Ej. Servicios del Caribe" maxlength="65"><label for="wa-sector">Rubro</label><input id="wa-sector" value="${escape(draft.sector)}" placeholder="Ej. Servicios, educación o comercio" maxlength="65"><div id="wa-error" role="alert" class="wa-error"></div><div class="wa-controls"><button id="wa-next" class="wa-primary cursor-interaction" type="button">Elegir plan</button><button id="wa-cancel" class="cursor-interaction" type="button">Cancelar</button></div>`;form.querySelector('#wa-next').onclick=()=>{draft.name=form.querySelector('#wa-name').value.trim();draft.sector=form.querySelector('#wa-sector').value.trim();if(!draft.name){form.querySelector('#wa-error').textContent='Escribe el nombre del negocio.';return;}step=1;wizard()};}
+      if(step===1){form.innerHTML=`<h3>Plan para ${escape(draft.name)}</h3><p class="wa-muted">Precios y cuotas por definir en la propuesta comercial.</p>${['CRM','CRM + Publicidad','CRM + OaaS'].map(p=>`<button class="wa-choice cursor-interaction" data-plan="${p}" aria-pressed="${draft.plan===p}" type="button"><strong>${p}</strong><br><span class="wa-muted">${p==='CRM'?'Atención, clientes y procesos':p.includes('Publicidad')?'CRM y medición de campañas':'CRM y procesos gestionados'}</span></button>`).join('')}<div class="wa-controls"><button id="wa-next" class="wa-primary cursor-interaction" type="button">Revisar alta</button><button id="wa-back" class="cursor-interaction" type="button">Volver</button><button id="wa-cancel" class="cursor-interaction" type="button">Cancelar</button></div>`;form.querySelectorAll('[data-plan]').forEach(x=>x.onclick=()=>{draft.plan=x.dataset.plan;wizard()});form.querySelector('#wa-next').onclick=()=>{step=2;wizard()};form.querySelector('#wa-back').onclick=()=>{step=0;wizard()};}
+      if(step===2){form.innerHTML=`<h3>${escape(draft.name)}</h3><div class="wa-row"><span>Plan seleccionado</span><strong>${draft.plan}</strong></div><div class="wa-row"><span>Rubro</span><span>${escape(draft.sector)||'Sin especificar'}</span></div><div class="wa-row"><span>Conexiones iniciales</span><strong>Ninguna</strong></div><p class="wa-muted" style="margin-top:16px">Alta simulada. En el producto, la activación requiere contratación o prueba verificada.</p><div class="wa-controls"><button id="wa-finish" class="wa-primary cursor-interaction" type="button">Crear negocio de demostración</button><button id="wa-back" class="cursor-interaction" type="button">Volver</button><button id="wa-cancel" class="cursor-interaction" type="button">Cancelar</button></div>`;form.querySelector('#wa-back').onclick=()=>{step=1;wizard()};form.querySelector('#wa-finish').onclick=()=>{const id='nuevo'+Object.keys(businesses).length;businesses[id]={name:draft.name,plan:draft.plan,ads:draft.plan.includes('Publicidad'),role:'Propietario',leads:0,sales:0,revenue:0,spend:0,account:null,channel:'Sin WhatsApp vinculado',runs:0,limit:500};const option=document.createElement('option');option.value=id;option.textContent=draft.name;picker.append(option);picker.value=id;selected=id;page='conexiones';render()};}
+      form.querySelector('#wa-cancel').onclick=()=>render();
+    }
+    picker.onchange=()=>{selected=picker.value;platform=false;root.querySelector('#wa-platform').textContent='Administración de plataforma';render()};
+    root.querySelectorAll('[data-page]').forEach(x=>x.onclick=()=>{platform=false;root.querySelector('#wa-platform').textContent='Administración de plataforma';page=x.dataset.page;render()});
+    root.querySelector('#wa-create').onclick=()=>{platform=false;root.querySelector('#wa-platform').textContent='Administración de plataforma';step=0;draft={name:'',sector:'',plan:'CRM'};wizard()};
+    root.querySelector('#wa-platform').onclick=()=>{platform=!platform;root.querySelector('#wa-platform').textContent=platform?'Volver al negocio':'Administración de plataforma';render()};
+    render();
+  })();
+  </script>
+</div>

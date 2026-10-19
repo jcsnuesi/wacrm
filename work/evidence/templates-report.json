@@ -1,0 +1,25 @@
+{
+  "capturedAt": "2026-10-15T01:14:06.598Z",
+  "screenshots": [
+    "21-real-template-objective.png",
+    "22-real-template-preview.png",
+    "23-real-template-blank.png",
+    "24-real-template-review.png",
+    "25-real-template-result.png",
+    "26-real-template-mobile.png"
+  ],
+  "errors": [],
+  "created": false,
+  "status": 503,
+  "result": {
+    "error": "El alta con plantillas necesita activar las migraciones 057 y 058 en Supabase.",
+    "code": "migration_required"
+  },
+  "checks": [
+    "Inmobiliaria sugerida por rubro",
+    "Objetivo alquiler",
+    "Edición de etapas",
+    "Desde cero sin etapas",
+    "Solicitud con plantilla, versión y objetivo"
+  ]
+}

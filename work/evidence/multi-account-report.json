@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-10-15T00:33:19.753Z",
+  "checks": [
+    {
+      "name": "UI switches active business and plan API context",
+      "business": "WACRM Test Business B",
+      "accountId": "67ee615f-f54d-4f04-9ea4-e48e19132c88",
+      "role": "admin",
+      "passed": true
+    },
+    {
+      "name": "UI switches active business and plan API context",
+      "business": "WACRM Test Business A",
+      "accountId": "273af064-7ccc-46c4-8fcf-d1c7f88f5b27",
+      "role": "owner",
+      "passed": true
+    }
+  ],
+  "screenshots": [
+    "13-real-multi-account-dropdown.png",
+    "14-real-business-b-active.png",
+    "15-real-business-a-active.png"
+  ],
+  "errors": [],
+  "limitations": [
+    "Selector is in the sidebar user menu.",
+    "Business creation onboarding remains pending.",
+    "Subscription migration has not been applied to this Supabase."
+  ]
+}
