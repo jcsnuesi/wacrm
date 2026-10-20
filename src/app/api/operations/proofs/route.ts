@@ -135,6 +135,14 @@ export async function POST(request: Request) {
       });
       if (preflight.error) return operationsError(preflight.error);
       if (
+        preflight.data?.role === 'professional' &&
+        !preflight.data.allowed_modules?.includes('proofs')
+      )
+        return NextResponse.json(
+          { error: 'Comprobantes no habilitados para tu acceso.' },
+          { status: 403 }
+        );
+      if (
         !preflight.data?.operations?.some(
           (op: { id: string }) => op.id === operation
         )

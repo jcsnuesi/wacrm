@@ -66,6 +66,21 @@ beforeEach(() => {
   );
 });
 describe('private proof boundary', () => {
+  it('rejects disabled employee proofs before privileged storage upload', async () => {
+    mocks.rpc.mockResolvedValue({
+      data: {
+        role: 'professional',
+        allowed_modules: ['sales'],
+        operations: [{ id: operation }],
+      },
+    });
+    expect((await POST(uploadRequest())).status).toBe(403);
+    expect(mocks.upload).not.toHaveBeenCalled();
+    expect(mocks.rpc).not.toHaveBeenCalledWith(
+      'ops_command',
+      expect.anything()
+    );
+  });
   it('stores a private file and requests a pending proof instead of crediting cash', async () => {
     const response = await POST(uploadRequest());
     expect(response.status).toBe(200);

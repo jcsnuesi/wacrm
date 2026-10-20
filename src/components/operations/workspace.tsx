@@ -119,10 +119,13 @@ export function OperationsWorkspace({
     )
       return;
     initializedSource.current = `${accountId}:${sourceMessage}:${dealId}`;
-    if (sourceMessage) {
+    if (
+      sourceMessage &&
+      (data.role !== 'professional' || data.allowed_modules?.includes('proofs'))
+    ) {
       setTab('proofs');
       setProof({ sourceMessage });
-    } else if (dealId) {
+    } else if (dealId && data.role !== 'professional') {
       setTab('sales');
       setClosing({ operation: null, dealId });
     }
@@ -157,7 +160,7 @@ export function OperationsWorkspace({
         const result = await response.json();
         if (!response.ok) throw new Error(result.error);
         pending.current = null;
-        setNotice('Operación registrada.');
+        setNotice(result.notice ?? 'Operación registrada.');
         setRevision((n) => n + 1);
         return true;
       } catch (err) {
@@ -304,23 +307,65 @@ export function OperationsWorkspace({
       }),
     });
   }
+  function employeeAccessFields(p?: Professional): FormField[] {
+    return [
+      {
+        name: 'access_enabled',
+        label: 'Permitir acceso al sistema',
+        type: 'checkbox',
+        value: !p || (!!p.access && p.access.status !== 'suspended'),
+      },
+      field(
+        'access_email',
+        'Correo del empleado (necesario para habilitar acceso)',
+        p?.access?.email ?? p?.linked_email ?? '',
+        'email',
+        false
+      ),
+      {
+        name: 'access_modules',
+        label: 'Módulos permitidos · puedes modificarlos después',
+        type: 'multi',
+        choices: (data?.employee_modules ?? []).map((m) => ({
+          id: m.id,
+          name: `${m.name} — ${m.description}`,
+        })),
+        value: p?.access?.modules ?? ['appointments', 'sales', 'commissions'],
+      },
+    ];
+  }
+  function accessPayload(f: FormData) {
+    const enabled = f.has('access_enabled');
+    const email = text(f, 'access_email').trim();
+    if (enabled && !email)
+      throw new Error('Indica el correo del empleado para habilitar acceso.');
+    return {
+      mode: enabled ? 'save' : 'suspend',
+      email,
+      modules: f.getAll('access_modules'),
+    };
+  }
+  function employeeAccessForm(p: Professional) {
+    open({
+      title: `Acceso y permisos · ${p.name}`,
+      action: 'employee_access',
+      description:
+        'Activa o suspende el acceso y elige los módulos de este empleado. Los cambios se aplican en su siguiente solicitud y conservan su historial.',
+      fields: employeeAccessFields(p),
+      payload: (f) => ({ professional_id: p.id, ...accessPayload(f) }),
+    });
+  }
   function professionalForm(p?: Professional) {
     open({
       title: p ? 'Editar profesional' : 'Nuevo profesional',
       action: 'professional',
       description:
-        'El correo es opcional. Para vincularlo, esa persona debe haberse registrado. Los porcentajes nuevos solo se aplican a cierres futuros.',
+        'Crea el perfil y, si habilitas acceso, enviaremos un enlace al empleado. No necesita registrarse antes. Los porcentajes nuevos solo se aplican a cierres futuros.',
       fields: [
         field('name', 'Nombre', p?.name),
         field('specialty', 'Especialidades', p?.specialty, 'text', false),
         field('photo_url', 'URL de foto', p?.photo_url ?? '', 'url', false),
-        field(
-          'linked_email',
-          'Correo de acceso opcional',
-          p?.linked_email ?? '',
-          'email',
-          false
-        ),
+        ...employeeAccessFields(p),
         {
           ...field(
             'service_percent',
@@ -356,7 +401,7 @@ export function OperationsWorkspace({
         name: text(f, 'name'),
         specialty: text(f, 'specialty'),
         photo_url: text(f, 'photo_url') || null,
-        linked_email: text(f, 'linked_email'),
+        employee_access: accessPayload(f),
         service_bps: Math.round(number(f, 'service_percent') * 100),
         product_bps: Math.round(number(f, 'product_percent') * 100),
         active: f.has('active'),
@@ -653,17 +698,36 @@ export function OperationsWorkspace({
       setError(err instanceof Error ? err.message : 'Archivo no disponible.');
     }
   }
-  const tabs = [
-    ['summary', 'Resumen'],
-    ...(appointmentsEnabled ? [['appointments', 'Agenda']] : []),
-    ['professionals', data.config?.professional_label ?? 'Profesionales'],
-    ...(servicesEnabled ? [['services', 'Servicios']] : []),
-    ['inventory', 'Inventario'],
-    ['sales', 'Operaciones'],
-    ['proofs', 'Comprobantes'],
-    ...(!professional ? [['finance', 'Finanzas']] : []),
-    ...(admin ? [['settings', 'Configuración']] : []),
-  ];
+  const allowed = new Set(data.allowed_modules ?? []);
+  const tabs = professional
+    ? [
+        ['summary', 'Mi espacio'],
+        ...(appointmentsEnabled && allowed.has('appointments')
+          ? [['appointments', 'Mi agenda']]
+          : []),
+        ...(allowed.has('sales') ? [['sales', 'Mis operaciones']] : []),
+        ...(allowed.has('commissions')
+          ? [['commissions', 'Mis comisiones']]
+          : []),
+        ...(allowed.has('proofs') ? [['proofs', 'Mis comprobantes']] : []),
+        ...(allowed.has('catalog')
+          ? [
+              ['services', 'Mis servicios'],
+              ['inventory', 'Productos disponibles'],
+            ]
+          : []),
+      ]
+    : [
+        ['summary', 'Resumen'],
+        ...(appointmentsEnabled ? [['appointments', 'Agenda']] : []),
+        ['professionals', data.config?.professional_label ?? 'Profesionales'],
+        ...(servicesEnabled ? [['services', 'Servicios']] : []),
+        ['inventory', 'Inventario'],
+        ['sales', 'Operaciones'],
+        ['proofs', 'Comprobantes'],
+        ...(!professional ? [['finance', 'Finanzas']] : []),
+        ...(admin ? [['settings', 'Configuración']] : []),
+      ];
   const activeTab = tabs.some(([id]) => id === tab) ? tab : 'summary';
   return (
     <div className="space-y-5">
@@ -735,7 +799,7 @@ export function OperationsWorkspace({
               </Button>
             ))}
           </nav>
-          {activeTab === 'summary' && (
+          {activeTab === 'summary' && !professional && (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
                 [
@@ -798,6 +862,60 @@ export function OperationsWorkspace({
               </section>
             </div>
           )}
+          {activeTab === 'summary' && professional && (
+            <section className={`${card} space-y-3`}>
+              <h2 className="text-xl font-semibold">
+                Hola, {data.professionals[0]?.name ?? 'bienvenido'}
+              </h2>
+              <p>
+                Este es tu espacio de trabajo en {accountName}. Solo verás tus
+                registros y los módulos habilitados por administración.
+              </p>
+              {!allowed.size && (
+                <p>
+                  Tu cuenta est? activa, pero aún no tienes módulos asignados.
+                  Solicítalos a tu administrador.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2">
+                {tabs
+                  .filter(([id]) => id !== 'summary')
+                  .map(([id, label]) => (
+                    <Button
+                      key={id}
+                      variant="outline"
+                      onClick={() => setTab(id)}
+                    >
+                      {label}
+                    </Button>
+                  ))}
+              </div>
+            </section>
+          )}
+          {activeTab === 'commissions' && professional && (
+            <section className={`${card} space-y-4`}>
+              <h2 className="text-xl font-semibold">Mis comisiones</h2>
+              <p>
+                Comisión del mes:{' '}
+                {money(data.professionals[0]?.commission_month)} · saldo
+                pendiente: {money(data.professionals[0]?.commission_balance)}
+              </p>
+              <h3 className="font-semibold">Movimientos y liquidaciones</h3>
+              <ul className="space-y-2">
+                {data.commissions.map((c) => (
+                  <li key={c.id}>
+                    {date(c.created_at)} · Comisión {money(c.amount_minor)}
+                  </li>
+                ))}
+                {data.settlements.map((c) => (
+                  <li key={c.id}>
+                    {date(c.created_at)} · Liquidación {money(c.amount_minor)} ·{' '}
+                    {c.reference}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {activeTab === 'appointments' && (
             <section className={`${card} space-y-4`}>
               <div className="flex flex-wrap gap-2">
@@ -851,19 +969,21 @@ export function OperationsWorkspace({
                               Iniciar atención
                             </Button>
                           )}
-                          <Button
-                            disabled={busy}
-                            onClick={() =>
-                              setClosing({
-                                operation:
-                                  data.operations.find(
-                                    (o) => o.id === a.operation_id
-                                  ) ?? null,
-                              })
-                            }
-                          >
-                            Completar y revisar venta
-                          </Button>
+                          {(!professional || allowed.has('sales')) && (
+                            <Button
+                              disabled={busy}
+                              onClick={() =>
+                                setClosing({
+                                  operation:
+                                    data.operations.find(
+                                      (o) => o.id === a.operation_id
+                                    ) ?? null,
+                                })
+                              }
+                            >
+                              Completar y revisar venta
+                            </Button>
+                          )}
                           <Button
                             variant="outline"
                             disabled={busy}
@@ -948,6 +1068,77 @@ export function OperationsWorkspace({
                         Cobrado de sus operaciones del mes:{' '}
                         {money(p.collected_month)}
                       </p>
+                    )}
+                    {admin && (
+                      <div className="border-border space-y-2 rounded-lg border p-3 text-sm">
+                        <p>
+                          Acceso:{' '}
+                          <strong>
+                            {p.access?.status === 'active'
+                              ? 'Activo'
+                              : p.access?.status === 'suspended'
+                                ? 'Suspendido'
+                                : p.access?.status === 'pending'
+                                  ? 'Invitación pendiente'
+                                  : 'Sin acceso'}
+                          </strong>
+                        </p>
+                        {p.access && (
+                          <p className="text-muted-foreground">
+                            {p.access.email} ·{' '}
+                            {(data.employee_modules ?? [])
+                              .filter((m) => p.access?.modules.includes(m.id))
+                              .map((m) => m.name)
+                              .join(', ') || 'Sin módulos asignados'}
+                          </p>
+                        )}
+                        {p.access?.status === 'pending' && (
+                          <p>
+                            {p.access.sent_at
+                              ? 'Correo enviado. Pendiente de activación.'
+                              : 'Envío pendiente; puedes reintentarlo.'}
+                          </p>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            variant="outline"
+                            disabled={busy}
+                            onClick={() => employeeAccessForm(p)}
+                          >
+                            Acceso y permisos
+                          </Button>
+                          {p.access?.status === 'pending' && (
+                            <Button
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                run('employee_access', {
+                                  professional_id: p.id,
+                                  mode: 'invite',
+                                  email: p.access!.email,
+                                  modules: p.access!.modules,
+                                })
+                              }
+                            >
+                              Reenviar acceso
+                            </Button>
+                          )}
+                          {p.access && p.access.status !== 'suspended' && (
+                            <Button
+                              variant="outline"
+                              disabled={busy}
+                              onClick={() =>
+                                run('employee_access', {
+                                  professional_id: p.id,
+                                  mode: 'suspend',
+                                })
+                              }
+                            >
+                              Suspender acceso
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     )}
                     <div className="flex flex-wrap gap-2">
                       {admin && (
@@ -1274,14 +1465,16 @@ export function OperationsWorkspace({
                             Registrar cobro
                           </Button>
                         )}
-                      {writable && o.status !== 'void' && (
-                        <Button
-                          variant="outline"
-                          onClick={() => setProof({ operationId: o.id })}
-                        >
-                          Adjuntar comprobante
-                        </Button>
-                      )}
+                      {writable &&
+                        o.status !== 'void' &&
+                        (!professional || allowed.has('proofs')) && (
+                          <Button
+                            variant="outline"
+                            onClick={() => setProof({ operationId: o.id })}
+                          >
+                            Adjuntar comprobante
+                          </Button>
+                        )}
                       {admin && o.status !== 'void' && (
                         <Button variant="outline" onClick={() => refund(o)}>
                           Devolución / crédito

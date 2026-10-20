@@ -9,6 +9,13 @@ export interface OpsConfig {
   closing_stage_id: string | null;
 }
 export interface Professional {
+  access?: {
+    email: string;
+    status: 'pending' | 'active' | 'suspended';
+    modules: string[];
+    sent_at: string | null;
+    expires_at: string | null;
+  } | null;
   id: string;
   name: string;
   specialty: string;
@@ -53,7 +60,7 @@ export interface OperationLine {
   returned_quantity: number;
   net_minor: number;
   credited_minor: number;
-  commission_bps: number;
+  commission_bps?: number;
 }
 export interface Operation {
   id: string;
@@ -102,6 +109,8 @@ export interface LedgerRow {
   note?: string;
 }
 export interface OpsData {
+  allowed_modules?: string[];
+  employee_modules?: { id: string; name: string; description: string }[];
   account_id: string;
   role: string;
   month: string;

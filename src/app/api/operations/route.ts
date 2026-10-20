@@ -7,6 +7,13 @@ import {
   operationsError,
 } from '@/lib/operations/server';
 import { checkRateLimit, rateLimitResponse } from '@/lib/rate-limit';
+import {
+  employeeInviteToken,
+  employeeProfessionalId,
+  employeeSiteUrl,
+  manageEmployeeAccess,
+} from '@/lib/operations/employee-access';
+import { hashInviteToken } from '@/lib/auth/invitations';
 export async function GET(request: Request) {
   try {
     const ctx = await getCurrentAccount({ allowProfessional: true });
@@ -18,8 +25,16 @@ export async function GET(request: Request) {
       p_month: month,
     });
     if (error) return operationsError(error);
+    // Older RPC definitions serialize a missing config as an object of nulls.
+    // Keep the first-use setup screen working before migration 061 is applied.
+    const dashboard = data
+      ? {
+          ...data,
+          config: data.config?.primary_activity == null ? null : data.config,
+        }
+      : data;
     return NextResponse.json(
-      { data },
+      { data: dashboard },
       { headers: { 'Cache-Control': 'private, no-store' } }
     );
   } catch (error) {
@@ -66,10 +81,78 @@ export async function POST(request: Request) {
         { error: 'Solicitud no válida.' },
         { status: 400 }
       );
+    if (body.action === 'employee_access') {
+      const outcome = await manageEmployeeAccess(
+        ctx,
+        body.payload.professional_id ?? '',
+        body.payload,
+        body.request_id
+      );
+      if (outcome instanceof Response) return outcome;
+      return NextResponse.json(outcome, {
+        headers: { 'Cache-Control': 'private, no-store' },
+      });
+    }
+    // Access management has a separate, admin-checked RPC. Never pass the email
+    // through the legacy "link an existing user" field when provisioning staff.
+    const payload = { ...body.payload };
+    const access = payload.employee_access;
+    delete payload.employee_access;
+    if (body.action === 'professional' && access) {
+      if (!['owner', 'admin'].includes(ctx.role))
+        return NextResponse.json(
+          { error: 'Solo administración puede crear empleados con acceso.' },
+          { status: 403 }
+        );
+      if (access.mode !== 'suspend' && !employeeSiteUrl())
+        return NextResponse.json(
+          {
+            error:
+              'Configura la URL pública del CRM antes de habilitar accesos.',
+          },
+          { status: 503 }
+        );
+      const professionalId =
+        payload.id ?? employeeProfessionalId(ctx.accountId, body.request_id);
+      if (!isUuid(professionalId))
+        return NextResponse.json(
+          { error: 'Profesional no válido.' },
+          { status: 400 }
+        );
+      const saved = await ctx.supabase.rpc('ops_employee_save', {
+        p_account: ctx.accountId,
+        p_payload: payload,
+        p_access: access,
+        p_request: body.request_id,
+        p_hash:
+          access.mode === 'suspend'
+            ? null
+            : hashInviteToken(
+                employeeInviteToken(
+                  ctx.accountId,
+                  professionalId,
+                  body.request_id
+                )
+              ),
+      });
+      if (saved.error) return operationsError(saved.error);
+      const outcome = await manageEmployeeAccess(
+        ctx,
+        saved.data.professional.id,
+        access,
+        body.request_id,
+        saved.data.access
+      );
+      if (outcome instanceof Response) return outcome;
+      return NextResponse.json(
+        { data: saved.data.professional, ...outcome },
+        { headers: { 'Cache-Control': 'private, no-store' } }
+      );
+    }
     const { data, error } = await ctx.supabase.rpc('ops_command', {
       p_account: ctx.accountId,
       p_action: body.action,
-      p_payload: body.payload,
+      p_payload: payload,
       p_request_id: body.request_id,
     });
     if (error) return operationsError(error);

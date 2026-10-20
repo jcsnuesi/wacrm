@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 export const COMMANDS = new Set([
+  'employee_access',
   'configure',
   'professional',
   'resource',
@@ -32,7 +33,7 @@ export function operationsError(error: { code?: string; message?: string }) {
     return NextResponse.json(
       {
         error:
-          'Los módulos operativos necesitan activar las migraciones 056–060 en Supabase.',
+          'Los módulos operativos necesitan activar las migraciones 056–062 en Supabase.',
         code: 'migration_required',
       },
       { status: 503 }
@@ -92,5 +93,13 @@ export function operationsError(error: { code?: string; message?: string }) {
 }
 export function foreignOrigin(request: Request) {
   const origin = request.headers.get('origin');
-  return !!origin && origin !== new URL(request.url).origin;
+  if (!origin) return false;
+  // The reverse proxy can give Next.js an internal HTTP request URL.
+  // Use the operator-configured public URL rather than forwarded headers.
+  try {
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim() || request.url;
+    return origin !== new URL(siteUrl).origin;
+  } catch {
+    return true;
+  }
 }

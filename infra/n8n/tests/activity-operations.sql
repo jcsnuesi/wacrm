@@ -11,6 +11,7 @@ CREATE TABLE public.deals(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),account_
 CREATE TABLE public.conversations(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),account_id UUID REFERENCES public.accounts(id));
 CREATE TABLE public.messages(id UUID PRIMARY KEY DEFAULT gen_random_uuid(),conversation_id UUID REFERENCES public.conversations(id),content_type TEXT,media_url TEXT);
 \ir 060_activity_operations.sql
+\ir 061_fix_unconfigured_operations_dashboard.sql
 CREATE TABLE test_ids(name TEXT PRIMARY KEY,id UUID NOT NULL);
 GRANT ALL ON test_ids TO authenticated;
 SET ROLE authenticated;
@@ -18,6 +19,9 @@ SELECT set_config('test.user_id','11111111-1111-4111-8111-111111111111',false);
 DO $$
 DECLARE account UUID; professional UUID; service UUID; product UUID; input UUID; booked JSONB; op UUID; proof UUID; result JSONB; working JSONB;
 BEGIN
+  account:=public.create_business('Sin configurar','General','USD','crm',gen_random_uuid());
+  result:=public.ops_dashboard(account);
+  IF result->'config' IS DISTINCT FROM 'null'::jsonb THEN RAISE EXCEPTION 'Unconfigured business must return config:null'; END IF;
   account:=public.create_activity_business('Servicios y productos','Servicios','USD','crm',gen_random_uuid(),'generic','schedule',1,'["Consulta","Finalizado"]','services','["products"]','UTC','Barbero');
   INSERT INTO test_ids VALUES('account',account);
   SELECT jsonb_agg(jsonb_build_object('weekday',d,'start','09:00','end','18:00')) INTO working FROM generate_series(1,7) d;
